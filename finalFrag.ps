@@ -1,0 +1,56 @@
+#version 400
+
+in vec2 uvVarying;
+
+out vec4 color;
+
+//uniform sampler2DMS texture0;
+uniform sampler2D texture0;
+uniform sampler2D texture1; // bloom buffer
+uniform sampler2D texture2; // light sample buffer
+uniform sampler2D texture3; // light shaft buffer
+uniform sampler2D texture10; // depth
+uniform float time;
+
+highp float snoise(vec2 co)
+{
+    return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
+}
+
+void main(){
+	vec2 duv = 1.0 / vec2(1920,1080);
+	vec4 tex[4];
+	//tex[0] = texelFetch(texture0, ivec2(uvVarying*vec2(960,540)), 0);
+	tex[0] = texture2D(texture0, uvVarying);
+	tex[1] = texture2D(texture1, uvVarying);
+
+	// sample light
+	tex[2] = textureLod(texture2, uvVarying, 8.0);
+	float adj = 2.0*min(1.7,length(tex[2].rgb))-1.9;
+
+	tex[0] -= .6*min(1.0,adj)*normalize(tex[0]);
+	tex[0] += tex[1];
+	
+
+	tex[0].r = pow(tex[0].r, .79);
+	tex[0].g = pow(tex[0].g, .9);
+	tex[0].b = pow(tex[0].b, 1.0);
+	
+	/*
+	float dep[3];
+	 dep[0] = texture2D(texture10, uvVarying).x;
+	 dep[1] = texture2D(texture10, uvVarying-abs(60*snoise(uvVarying))*vec2(duv.x,0)).x;
+	 dep[2] = texture2D(texture10, uvVarying+abs(60*snoise(uvVarying))*vec2(duv.x,0)).x;
+	
+	*/
+	
+	tex[0] += texture2D(texture3, uvVarying);
+	
+	/*
+	if (dep[0] > dep[1] && dep[0] > dep[2])
+		if ( abs(dep[0] - dep[1]) < .01)
+		if ( abs(dep[0] - dep[2]) < .01)
+			tex[0] = vec4(0,0,0,1);
+			*/
+    color = tex[0];
+}

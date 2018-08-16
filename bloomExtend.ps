@@ -1,0 +1,29 @@
+#version 400
+layout(location = 0) out vec4 color;
+
+uniform sampler2D texture0;
+uniform sampler2D texture2; // light sample
+
+
+in vec2 uvVarying;
+//uniform float pass; // 1 = sample w/ mipmap, 2 = threshold for bloom
+
+void main()
+{	
+	vec4 tex[4];
+	color = vec4(0,0,0,1);
+	
+	tex[0] = texture2D(texture0, uvVarying).rgba;
+	tex[2] = textureLod(texture2, uvVarying, 8.0);
+	float adj = min(1.5, 2* length(tex[2].rgb)-1.7);
+	
+	tex[0] -= .5*adj*normalize(tex[0]);
+	
+	float energy = length(tex[0].rgb);
+	if (energy> .7)
+	{
+		color = vec4(2.0*(tex[0].rgb-vec3(.7)),1);
+
+	}
+
+}

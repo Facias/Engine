@@ -1,0 +1,86 @@
+#version 400 core
+layout(location = 0) out vec4 color;
+uniform sampler2D texture0;
+
+
+uniform vec2 blurScale;
+
+in vec2 uvVarying;
+uniform float kernel;
+
+void main()
+{
+	//color = vec4(kernel,0,0,1);//texture2D(texture0, uvVarying +.1);
+	//return;
+
+	if (int(kernel) == 0)
+	{
+		color = texture2D(texture0, uvVarying );
+		return;
+	}
+
+	if (int(kernel) == 10)
+	{
+		color += texture2D(texture0, uvVarying + (vec2(-10.0) * blurScale.xy)) * (.01602);
+		color += texture2D(texture0, uvVarying + (vec2(-9.0) * blurScale.xy)) * (.03695);
+		color += texture2D(texture0, uvVarying + (vec2(-8.0) * blurScale.xy)) * (.057134);
+		color += texture2D(texture0, uvVarying + (vec2(-7.0) * blurScale.xy)) * (.076101);
+		color += texture2D(texture0, uvVarying + (vec2(-6.0) * blurScale.xy)) * (.093444);
+		color += texture2D(texture0, uvVarying + (vec2(-5.0) * blurScale.xy)) * (.108797);
+		color += texture2D(texture0, uvVarying + (vec2(-4.0) * blurScale.xy)) * (.121831);
+		color += texture2D(texture0, uvVarying + (vec2(-3.0) * blurScale.xy)) * (.132269);
+		color += texture2D(texture0, uvVarying + (vec2(-2.0) * blurScale.xy)) * (.139887);
+		color += texture2D(texture0, uvVarying + (vec2(-1.0) * blurScale.xy)) * (.144524);
+		color += texture2D(texture0, uvVarying + (vec2(0.0) * blurScale.xy)) * (.146081);
+		color += texture2D(texture0, uvVarying + (vec2(10.0) * blurScale.xy)) * (.01602);
+		color += texture2D(texture0, uvVarying + (vec2(9.0) * blurScale.xy)) * (.03695);
+		color += texture2D(texture0, uvVarying + (vec2(8.0) * blurScale.xy)) * (.057134);
+		color += texture2D(texture0, uvVarying + (vec2(7.0) * blurScale.xy)) * (.076101);
+		color += texture2D(texture0, uvVarying + (vec2(6.0) * blurScale.xy)) * (.093444);
+		color += texture2D(texture0, uvVarying + (vec2(5.0) * blurScale.xy)) * (.108797);
+		color += texture2D(texture0, uvVarying + (vec2(4.0) * blurScale.xy)) * (.121831);
+		color += texture2D(texture0, uvVarying + (vec2(3.0) * blurScale.xy)) * (.132269);
+		color += texture2D(texture0, uvVarying + (vec2(2.0) * blurScale.xy)) * (.139887);
+		color += texture2D(texture0, uvVarying + (vec2(1.0) * blurScale.xy)) * (.144524);
+		color /= 2.0;
+		
+		return;
+	}
+
+	if ( int(kernel) == 6)
+	{
+		color += texture2D(texture0, uvVarying + (vec2(-6.0) * blurScale.xy)) * (.04048); //(1.0/64.0);
+		color += texture2D(texture0, uvVarying + (vec2(-5.0) * blurScale.xy)) * (.09212); //(6.0/64.0);
+		color += texture2D(texture0, uvVarying + (vec2(-4.0) * blurScale.xy)) * (.13887); // (15.0/64.0);
+		color += texture2D(texture0, uvVarying + (vec2(-3.0) * blurScale.xy)) * (.17815); //(1.0/64.0);
+		color += texture2D(texture0, uvVarying + (vec2(-2.0) * blurScale.xy)) * (.20782); //(6.0/64.0);
+		color += texture2D(texture0, uvVarying + (vec2(-1.0) * blurScale.xy)) * (.22628); // (15.0/64.0);
+		color += texture2D(texture0, uvVarying + (vec2(0.0) * blurScale.xy))  * (.23255); //(20.0/64.0);
+		color += texture2D(texture0, uvVarying + (vec2(1.0) * blurScale.xy))  * (.22628); //(15.0/64.0);
+		color += texture2D(texture0, uvVarying + (vec2(2.0) * blurScale.xy))  * (.20782); //(6.0/64.0);
+		color += texture2D(texture0, uvVarying + (vec2(3.0) * blurScale.xy))  * (.17815); //(1.0/64.0);
+		color += texture2D(texture0, uvVarying + (vec2(4.0) * blurScale.xy))  * (.13887); //(15.0/64.0);
+		color += texture2D(texture0, uvVarying + (vec2(5.0) * blurScale.xy))  * (.09212); //(6.0/64.0);
+		color += texture2D(texture0, uvVarying + (vec2(6.0) * blurScale.xy))  * (.04048); //(1.0/64.0);
+		color /= 2.0;
+
+		return;
+	}
+
+	if (int(kernel) == 3)
+	{
+		color += texture2D(texture0, uvVarying + (vec2(-3.0) * blurScale.xy)) * (1.0/64.0);
+		color += texture2D(texture0, uvVarying + (vec2(-2.0) * blurScale.xy)) * (6.0/64.0);
+		color += texture2D(texture0, uvVarying + (vec2(-1.0) * blurScale.xy)) * (15.0/64.0);
+		color += texture2D(texture0, uvVarying + (vec2(0.0) * blurScale.xy))  * (20.0/64.0);
+		color += texture2D(texture0, uvVarying + (vec2(1.0) * blurScale.xy))  * (15.0/64.0);
+		color += texture2D(texture0, uvVarying + (vec2(2.0) * blurScale.xy))  * (6.0/64.0);
+		color += texture2D(texture0, uvVarying + (vec2(3.0) * blurScale.xy))  * (1.0/64.0);
+		
+		return;
+	}
+
+
+
+
+}

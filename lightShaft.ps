@@ -1,0 +1,129 @@
+#version 400
+in vec2 posVarying;
+in vec2 uvVarying;
+
+uniform sampler2D texture0;
+uniform sampler2D texture1;
+
+uniform vec3 lightpos;
+uniform float pass;
+uniform vec2 resolution;;
+
+out vec4 color;
+
+highp float snoise(vec2 co)
+{
+    return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
+}
+
+void main()
+{
+	float size_ratio = resolution.y/1080.0;
+	
+	vec2 screenUV =  gl_FragCoord.xy/resolution ;
+	
+	if (int(pass) ==0)
+	{
+		float zNear = .1;
+		float zFar = 1000;
+		float z_b = texture2D(texture0, uvVarying).x;
+		float z_n = 2.0 * z_b - 1.0;
+		float realdep0 = 2.0 * zNear * zFar / (zFar + zNear - z_n * (zFar - zNear));
+
+		color= vec4(0,0,0,1);
+		
+		if (realdep0 > 200) color = vec4(0,.5,1,1);
+		
+		if (realdep0 > 200) 
+		{
+			if (lightpos.z > 0.01)
+			{
+				float lightdist = length(resolution*uvVarying-lightpos.xy);
+				float ar = 600;
+				if ( lightdist < ar )
+					color = vec4(1);
+			}
+		}
+		
+
+		
+		return;
+	}
+	
+	if (int(pass) ==1)
+	{
+		color = 2*pow(texture2D(texture1,uvVarying),vec4(1));
+	}
+	
+	if (int(pass) == 2)
+	{
+		float ar = 600;
+		float maxraylength = ar*size_ratio;
+		if (lightpos.z > 0.1)
+		{
+			
+			float lightdist = length(uvVarying*resolution-lightpos.xy);
+			if (lightdist<maxraylength)
+			{
+				
+				float bright = texture2D(texture1, uvVarying).x;
+				if (bright>.5) 
+				{
+					float traveldelta = 2.0*(1.0+.5*lightdist/ar);
+					vec3 fincol = mix( vec3(1), vec3(1), min(1.0,lightdist/ar));
+					color = vec4(fincol*pow(1-1*lightdist/maxraylength,4.0) * traveldelta/(2.0*(1.0+2*lightdist/ar)),1);
+
+					return;
+				}
+
+				vec2 dir = uvVarying*resolution-lightpos.xy;
+				dir = normalize(dir);
+				vec2 duv ;
+				float traveldelta = (2.0)*(lightdist/ar)+1;
+				
+				//color = vec4(vec3(traveldelta),1);
+				//return;
+
+				duv= 1.0/resolution;
+				
+				int hit = 0;
+				int n = 0;
+				float travel = 0.0;
+				float hitdist = 1.0;
+				while( hit == 0 && n < 180 && travel<lightdist-traveldelta)
+				{
+					n++;
+					travel = travel + traveldelta;
+					if (travel+8 > lightdist) break;
+					float val = texture2D(texture1, uvVarying + travel*duv *-dir).x;
+					if (val > .5)
+					{ 
+						hit = 1;
+
+						hitdist = length(lightpos.xy - (uvVarying*resolution + travel*duv *-dir));
+						
+						vec3 fincol = mix( vec3(2,2,.3), vec3(1.5), min(1, 20*pow(lightdist - hitdist,1.0)) );
+						color = vec4(fincol*pow(1-1*lightdist/maxraylength,2.0) * traveldelta/(2.0*(1.0+2*lightdist/200.00)),1);
+						color = vec4(fincol*pow(1-min(1.0,lightdist/maxraylength),3.0)* traveldelta/(2.0*(1.0+2*lightdist/200.00)),1);
+						//color.rgb *= hitdist/200.0;
+						//return;
+						//color = vec4( vec3( lightdist - hitdist) ,1);
+						return;
+						
+					}
+				}
+
+				color = vec4(0,0,0,1);
+				return;
+			}
+			
+		}
+		
+		
+		color = vec4(0,0,0,1);
+		return;
+		
+
+	}
+	
+}

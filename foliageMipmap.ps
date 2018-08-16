@@ -1,0 +1,18 @@
+#version 400
+layout(location = 0) out vec4 color;
+
+
+uniform sampler2D texture0;
+
+in vec2 uvVarying;
+
+
+void main()
+{
+	vec4 tex = texture2D(texture0, uvVarying);	
+	
+
+	color = tex;
+
+
+}

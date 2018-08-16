@@ -1,0 +1,67 @@
+#version 400 core
+layout(location = 0) out vec4 color;
+
+uniform vec4 vcolor;
+in vec3 posVarying;
+in vec2 uvVarying;
+
+
+
+uniform sampler2D texture0;
+uniform sampler2D texture1;
+uniform sampler2D texture2;
+uniform sampler2D texture3;
+
+uniform sampler2D texture4;
+uniform sampler2D texture5;
+uniform sampler2D texture6;
+uniform sampler2D texture7;
+
+
+void main()
+{
+
+	color = vec4(0,0,0,1);
+
+	// first cascade
+	if (uvVarying.x <.25)
+	{
+		highp float v = texture2D(texture0, uvVarying*vec2(4,1)).r;
+		vec4 col = texture2D(texture4, uvVarying*vec2(4,1));
+		gl_FragDepth = v;
+		color = col;
+		color.a = 1.0;
+		return;
+	}
+	// second cascade
+	if (uvVarying.x >= .25 && uvVarying.x < .5)
+	{
+		highp float v = texture2D(texture1, (uvVarying-vec2(.25,0))*vec2(4,1)).r;
+		vec4 col = texture2D(texture5, (uvVarying-vec2(.25,0))*vec2(4,1));
+		gl_FragDepth = v;
+		color = col;
+		color.a = 1.0;
+		return;
+	}
+	// third cascade
+	if (uvVarying.x >= .5 && uvVarying.x < .75)
+	{
+		highp float v = texture2D(texture2, (uvVarying-vec2(.5,0))*vec2(4,1)).r;
+		vec4 col = texture2D(texture6, (uvVarying-vec2(.5,0))*vec2(4,1));
+		gl_FragDepth = v;
+		color = col;
+		color.a = 1.0;
+		return;
+	}
+	// fourth cascade
+	if (uvVarying.x >= .75 && uvVarying.x < 1.0)
+	{
+		highp float v = texture2D(texture3, (uvVarying-vec2(.75,0))*vec2(4,1)).r;
+		vec4 col = texture2D(texture7, (uvVarying-vec2(.75,0))*vec2(4,1));
+		gl_FragDepth = v;
+		color = col;
+		color.a = 1.0;
+		return;
+	}
+	
+}

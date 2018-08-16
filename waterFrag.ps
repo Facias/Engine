@@ -1,0 +1,762 @@
+#version 400 core
+layout(location = 0) out vec4 color;
+
+uniform vec4 vcolor;
+in vec3 posVarying;
+in vec2 uvVarying;
+in vec3 normalVarying;
+flat in vec3 normalFlat;
+uniform vec4 tile;
+
+uniform sampler2D texture0;
+uniform sampler2D texture1;//distortion
+
+in mat3 TBN;
+
+uniform sampler2D texture11;
+uniform sampler2D texture12;
+uniform sampler2D texture14;
+uniform sampler2D texture15;
+
+uniform float samples;
+uniform sampler2DMS texture16;
+uniform sampler2D texture10;
+
+uniform float time;
+uniform vec3 campos;
+uniform vec2 resolution;
+uniform float clarity;
+
+uniform float shadowMapSize;
+
+in vec4 transformLight0;
+in vec4 transformLight1;
+in vec4 transformLight2;
+in vec4 transformLight3;
+
+uniform vec3 cascadeCenter0;
+uniform vec3 cascadeCenter1;
+uniform vec3 cascadeCenter2;
+uniform vec3 cascadeCenter3;
+
+highp float snoise(vec2 co)
+{
+    return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
+}
+
+
+vec4 cubic(float v){
+    vec4 n = vec4(1.0, 2.0, 3.0, 4.0) - v;
+    vec4 s = n * n * n;
+    float x = s.x;
+    float y = s.y - 4.0 * s.x;
+    float z = s.z - 4.0 * s.y + 6.0 * s.x;
+    float w = 6.0 - x - y - z;
+    return vec4(x, y, z, w) * (1.0/6.0);
+}
+
+vec4 textureCubic(sampler2D sampler, vec2 texCoords)
+{
+
+   vec2 texSize = textureSize(sampler, 0);
+   vec2 invTexSize = 1.0 / texSize;
+   
+   texCoords = texCoords * texSize - 0.5;
+
+   
+    vec2 fxy = fract(texCoords);
+    texCoords -= fxy;
+
+    vec4 xcubic = cubic(fxy.x);
+    vec4 ycubic = cubic(fxy.y);
+
+    vec4 c = texCoords.xxyy + vec2(-0.5, +1.5).xyxy;
+    
+    vec4 s = vec4(xcubic.xz + xcubic.yw, ycubic.xz + ycubic.yw);
+    vec4 offset = c + vec4(xcubic.yw, ycubic.yw) / s;
+    
+    offset *= invTexSize.xxyy;
+    
+    vec4 sample0 = texture2D(sampler, offset.xz);
+    vec4 sample1 = texture2D(sampler, offset.yz);
+    vec4 sample2 = texture2D(sampler, offset.xw);
+    vec4 sample3 = texture2D(sampler, offset.yw);
+
+    float sx = s.x / (s.x + s.y);
+    float sy = s.z / (s.z + s.w);
+
+    return mix(mix(sample3, sample2, sx), mix(sample1, sample0, sx), sy);
+}
+
+float shadowSample(highp vec2 uv, int cascade)
+{
+
+
+	float ortho = abs( dot(vec3(.577), normalFlat));
+	
+	// fix the modulus gap between texels
+	float mod_offset = 1.0/512.0;
+
+
+	if (cascade == 0)
+	{
+		float shadow[36];
+		for (int n = 0; n< 36; n++)
+			shadow[n] = 1.0;
+
+		highp float acompare = (transformLight0.z + transformLight0.w)/2.0;
+
+		highp vec4 val[9];
+		highp vec2 duv = 1.0/vec2(4*shadowMapSize,-shadowMapSize);
+		
+		for (int n = 0; n<3; n++)
+		{
+			val[n] = textureGather(texture15, uv+vec2(-1.5+2.0*n,-1.5)*duv, 0);
+			if (val[n].x < acompare) shadow[2*n] = 0.0;
+			if (val[n].y < acompare) shadow[2*n+1] = 0.0;
+			if (val[n].w < acompare) shadow[2*n+6] = 0.0;
+			if (val[n].z < acompare) shadow[2*n+7] = 0.0;
+		}
+	
+		for (int n = 0; n<3; n++)
+		{	
+			val[n+3] = textureGather(texture15, uv+vec2(-1.5+2.0*n,.5)*duv, 0);
+			if (val[n+3].x < acompare) shadow[n*2+12] = 0.0;
+			if (val[n+3].y < acompare) shadow[n*2+13] = 0.0;
+			if (val[n+3].w < acompare) shadow[n*2+18] = 0.0;
+			if (val[n+3].z < acompare) shadow[n*2+19] = 0.0;
+		}
+
+		for (int n = 0; n<3; n++)
+		{
+			val[n+6] = textureGather(texture15, uv+vec2(-1.5+2.0*n,2.5)*duv, 0);
+			if (val[n+6].x < acompare) shadow[n*2+24] = 0.0;
+			if (val[n+6].y < acompare) shadow[n*2+25] = 0.0;
+			if (val[n+6].w < acompare) shadow[n*2+30] = 0.0;
+			if (val[n+6].z < acompare) shadow[n*2+31] = 0.0;
+		}
+
+
+		highp vec2 frac = uv*vec2(4*shadowMapSize,shadowMapSize) - floor(uv*vec2(4*shadowMapSize,shadowMapSize));
+		if ( int(floor(uv.x*4*shadowMapSize)) < int(floor(uv.x*4*shadowMapSize+mod_offset)) ) frac.x = 0.0;
+		if ( int(floor(uv.y*shadowMapSize)) < int(floor(uv.y*shadowMapSize+mod_offset)) ) frac.y = 0.0;
+		
+
+		
+		float ave[25];
+		float y0, y1;
+		
+		for (int m = 0; m <5; m++)
+		{
+			for (int n = 0 ; n <5; n++)
+			{
+				y0 = mix( shadow[n+6+6*m], shadow[n+6*m], frac.y);
+				y1 = mix( shadow[n+7+6*m], shadow[n+1+6*m], frac.y);
+				ave[n+5*m] = mix(y0, y1, frac.x);
+			}
+		}
+		
+		float weight[3];
+		weight[0] = 0.56888889;
+		weight[1] = 0.47862867;
+		weight[2] = 0.23692689;
+
+		 
+		float sum = 0;
+		for (int w = -2; w<3; w++)
+			for (int h = -2; h<3; h++)
+				sum += weight[abs(w)]*weight[abs(h)]*ave[(w+2)+5*(h+2)];
+		
+		sum /= 4.0;
+		
+
+		return sum;//ave[12];
+	}
+	
+	if (cascade == 1)
+	{
+		float shadow[16];
+		for (int n = 0; n< 16; n++)
+			shadow[n] = 1.0;
+			
+
+		highp float acompare = (transformLight1.z + transformLight1.w)/2.0;
+		
+		highp vec4 val[4];
+		highp vec2 duv = 1.0/vec2(4*shadowMapSize,-shadowMapSize);
+		
+		for (int m = 0; m<2; m++)
+		{
+			for (int n = 0; n<2; n++)
+			{
+				val[n+2*m] = textureGather(texture15, uv+vec2(-.5+2.0*n,-.5+2.0*m)*duv, 0);
+
+				if (val[n+2*m].x < acompare) shadow[2*n+8*m] = 0.0;
+				if (val[n+2*m].y < acompare) shadow[2*n+1+8*m] = 0.0;
+				if (val[n+2*m].w < acompare) shadow[2*n+4+8*m] = 0.0;
+				if (val[n+2*m].z < acompare) shadow[2*n+5+8*m] = 0.0;
+			}
+		}
+
+		highp vec2 frac = uv*vec2(4*shadowMapSize,shadowMapSize) - floor(uv*vec2(4*shadowMapSize,shadowMapSize));
+		if ( int(floor(uv.x*4*shadowMapSize)) < int(floor(uv.x*4*shadowMapSize+mod_offset)) ) frac.x = 0.0;
+		if ( int(floor(uv.y*shadowMapSize)) < int(floor(uv.y*shadowMapSize+mod_offset)) ) frac.y = 0.0;
+		
+		
+		float ave[9];
+		float y0, y1;
+		
+		for (int m = 0; m<3; m++)
+		{
+			for (int n = 0; n<3; n++)
+			{
+				y0 = mix( shadow[n+4+4*m], shadow[n+4*m], frac.y);
+				y1 = mix( shadow[n+5+4*m], shadow[n+1+4*m], frac.y);
+				ave[n+3*m] = mix(y0, y1, frac.x);
+			}
+		}
+		
+		float weight[2];
+		weight[0] = 0.8888889;
+		weight[1] = 0.5555556;
+
+		float sum = 0;
+		for (int w = -1; w<2; w++)
+			for (int h = -1; h<2; h++)
+				sum += weight[abs(w)]*weight[abs(h)]*ave[(w+1)+3*(h+1)];
+		
+		sum /= 4.0;
+		
+
+		
+		return sum;
+	}
+		
+	if (cascade == 2)
+	{
+		float shadow[16];
+		for (int n = 0; n< 16; n++)
+			shadow[n] = 1.0;
+			
+
+		
+		highp float acompare = (transformLight2.z + transformLight2.w)/2.0;
+
+		highp vec4 val[4];
+		highp vec2 duv = 1.0/vec2(4*shadowMapSize,-shadowMapSize);
+		
+		for (int m = 0; m<2; m++)
+		{
+			for (int n = 0; n<2; n++)
+			{
+				val[n+2*m] = textureGather(texture15, uv+vec2(-.5+2.0*n,-.5+2.0*m)*duv, 0);
+
+				if (val[n+2*m].x < acompare) shadow[2*n+8*m] = 0.0;
+				if (val[n+2*m].y < acompare) shadow[2*n+1+8*m] = 0.0;
+				if (val[n+2*m].w < acompare) shadow[2*n+4+8*m] = 0.0;
+				if (val[n+2*m].z < acompare) shadow[2*n+5+8*m] = 0.0;
+			}
+		}
+
+		highp vec2 frac = uv*vec2(4*shadowMapSize,shadowMapSize) - floor(uv*vec2(4*shadowMapSize,shadowMapSize));
+		if ( int(floor(uv.x*4*shadowMapSize)) < int(floor(uv.x*4*shadowMapSize+1.0/512.0)) ) frac.x = 0.0;
+		if ( int(floor(uv.y*shadowMapSize)) < int(floor(uv.y*shadowMapSize+1.0/512.0)) ) frac.y = 0.0;
+		
+		//float x0 = mix( shadow[3], shadow[0], frac.y);
+		//float x1 = mix( shadow[2], shadow[1], frac.y);
+		//ave = mix(x0,x1,frac.x);
+		
+		float ave[9];
+		float y0, y1;
+		
+		 y0 = mix( shadow[4], shadow[0], frac.y);
+		 y1 = mix( shadow[5], shadow[1], frac.y);
+		 ave[0] = mix(y0, y1, frac.x);
+		
+		 y0 = mix( shadow[5], shadow[1], frac.y);
+		 y1 = mix( shadow[6], shadow[2], frac.y);
+		 ave[1] = mix(y0, y1, frac.x);
+		 
+		 y0 = mix( shadow[6], shadow[2], frac.y);
+		 y1 = mix( shadow[7], shadow[3], frac.y);
+		 ave[2] = mix(y0, y1, frac.x);
+		 
+		 // second row
+		 y0 = mix( shadow[8], shadow[4], frac.y);
+		 y1 = mix( shadow[9], shadow[5], frac.y);
+		 ave[3] = mix(y0, y1, frac.x);
+		 
+		 y0 = mix( shadow[9], shadow[5], frac.y);
+		 y1 = mix( shadow[10], shadow[6], frac.y);
+		 ave[4] = mix(y0, y1, frac.x);
+		 
+		 y0 = mix( shadow[10], shadow[6], frac.y);
+		 y1 = mix( shadow[11], shadow[7], frac.y);
+		 ave[5] = mix(y0, y1, frac.x);
+		 
+		 // third row
+		 y0 = mix( shadow[12], shadow[8], frac.y);
+		 y1 = mix( shadow[13], shadow[9], frac.y);
+		 ave[6] = mix(y0, y1, frac.x);
+		 
+		 y0 = mix( shadow[13], shadow[9], frac.y);
+		 y1 = mix( shadow[14], shadow[10], frac.y);
+		 ave[7] = mix(y0, y1, frac.x);
+		 
+		 y0 = mix( shadow[14], shadow[10], frac.y);
+		 y1 = mix( shadow[15], shadow[11], frac.y);
+		 ave[8] = mix(y0, y1, frac.x);
+		 
+		
+		
+		float weight[2];
+		weight[0] = 0.8888889;
+		weight[1] = 0.5555556;
+
+
+		 
+		float sum = 0;
+		for (int w = -1; w<2; w++)
+			for (int h = -1; h<2; h++)
+				sum += weight[abs(w)]*weight[abs(h)]*ave[(w+1)+3*(h+1)];
+		
+		sum /= 4.0;
+		
+		//sum = shadow[15];
+		return sum;
+	}
+	
+	if (cascade == 3)
+	{
+		float shadow[4];
+		for (int n = 0; n< 4; n++)
+			shadow[n] = 1.0;
+			
+		highp float acompare = (transformLight3.z + transformLight3.w)/2.0;
+
+
+		highp vec4 val[1];
+		highp vec2 duv = 1.0/vec2(4*shadowMapSize,-shadowMapSize);
+		val[0] = textureGather(texture15, uv+vec2(.5,.5)*duv, 0);
+		
+		;
+		if (val[0].x < acompare) shadow[0] = 0.0;
+		if (val[0].y < acompare) shadow[1] = 0.0;
+		if (val[0].w < acompare) shadow[2] = 0.0;
+		if (val[0].z < acompare) shadow[3] = 0.0;
+
+		highp vec2 frac = uv*vec2(4*shadowMapSize,shadowMapSize) - floor(uv*vec2(4*shadowMapSize,shadowMapSize));
+		if ( int(floor(uv.x*4*shadowMapSize)) < int(floor(uv.x*4*shadowMapSize+mod_offset)) ) frac.x = 0.0;
+		if ( int(floor(uv.y*shadowMapSize)) < int(floor(uv.y*shadowMapSize+mod_offset)) ) frac.y = 0.0;
+		
+		float ave;
+		float y0, y1;
+		
+		 y0 = mix( shadow[2], shadow[0], frac.y);
+		 y1 = mix( shadow[3], shadow[1], frac.y);
+		 ave = mix(y0, y1, frac.x);
+		
+		return ave;
+	}
+}
+
+
+float shadowSampleRaw(highp vec2 uv, int cascade)
+{
+	// fix the modulus gap between texels
+	float mod_offset = 1.0/512.0;
+	highp float compare;
+	
+	if (cascade == 0) compare = (transformLight0.z + transformLight0.w)/2.0;
+	if (cascade == 1) compare = (transformLight1.z + transformLight1.w)/2.0;
+	if (cascade == 2) compare = (transformLight2.z + transformLight2.w)/2.0;
+	if (cascade == 3) compare = (transformLight3.z + transformLight3.w)/2.0;
+
+
+	float shadow[4];
+	for (int n = 0; n< 4; n++)
+		shadow[n] = 1.0;
+		
+	
+	float bias = .0003;	
+	
+	vec2 ddepth = (texture2D(texture14, uv).xy-.5)/(50.0f);
+	ddepth = max(vec2(-.00015), min(ddepth,.00015));
+		
+	highp vec4 val;
+	highp vec2 duv = 1.0/vec2(4*shadowMapSize,-shadowMapSize);
+	val = textureGather(texture15, uv+vec2(.5,.5)*duv, 0);
+	
+	float acompare = compare -bias-4*abs(ddepth.x)-4*abs(ddepth.y);
+	if (val.x < acompare) shadow[0] = 0.0;
+	if (val.y < acompare) shadow[1] = 0.0;
+	if (val.w < acompare) shadow[2] = 0.0;
+	if (val.z < acompare) shadow[3] = 0.0;
+
+	highp vec2 frac = uv*vec2(4*shadowMapSize,shadowMapSize) - floor(uv*vec2(4*shadowMapSize,shadowMapSize));
+	if ( int(floor(uv.x*4*shadowMapSize)) < int(floor(uv.x*4*shadowMapSize+mod_offset)) ) frac.x = 0.0;
+	if ( int(floor(uv.y*shadowMapSize)) < int(floor(uv.y*shadowMapSize+mod_offset)) ) frac.y = 0.0;
+	
+	float ave;
+	float y0, y1;
+	
+	 y0 = mix( shadow[2], shadow[0], frac.y);
+	 y1 = mix( shadow[3], shadow[1], frac.y);
+	 ave = mix(y0, y1, frac.x);
+	
+	return ave;
+
+}
+
+
+/*
+float shadowSample(highp vec2 uv, int cascade)
+{
+
+	float ortho = 1-pow( dot(vec3(.577),normalFlat) , 1);
+	
+	if (cascade == 2)
+	{
+		float shadow[36];
+		for (int n = 0; n< 36; n++)
+			shadow[n] = 1.0;
+		
+		
+		highp float compare = (transformLight2.z + transformLight2.w)/2.0;
+		float bias = .000002;	
+		bias += min(.000025*max(0.0,ortho),.00003);	
+		
+
+		highp vec4 val[9];
+		highp vec2 duv = 1.0/vec2(4*shadowMapSize,-shadowMapSize);
+		
+		float acompare = compare -bias;
+		
+		for (int n = 0; n<3; n++)
+		{
+			val[n] = textureGather(texture15, uv+vec2(-1.5+2.0*n,-1.5)*duv, 0);
+			if (val[n].x < acompare) shadow[2*n] = 0.0;
+			if (val[n].y < acompare) shadow[2*n+1] = 0.0;
+			if (val[n].w < acompare) shadow[2*n+6] = 0.0;
+			if (val[n].z < acompare) shadow[2*n+7] = 0.0;
+		}
+	
+		for (int n = 0; n<3; n++)
+		{	
+			val[n+3] = textureGather(texture15, uv+vec2(-1.5+2.0*n,.5)*duv, 0);
+			if (val[n+3].x < acompare) shadow[n*2+12] = 0.0;
+			if (val[n+3].y < acompare) shadow[n*2+13] = 0.0;
+			if (val[n+3].w < acompare) shadow[n*2+18] = 0.0;
+			if (val[n+3].z < acompare) shadow[n*2+19] = 0.0;
+		}
+
+		for (int n = 0; n<3; n++)
+		{
+			val[n+6] = textureGather(texture15, uv+vec2(-1.5+2.0*n,2.5)*duv, 0);
+			if (val[n+6].x < acompare) shadow[n*2+24] = 0.0;
+			if (val[n+6].y < acompare) shadow[n*2+25] = 0.0;
+			if (val[n+6].w < acompare) shadow[n*2+30] = 0.0;
+			if (val[n+6].z < acompare) shadow[n*2+31] = 0.0;
+		}
+
+		highp vec2 frac = uv*vec2(4*shadowMapSize,shadowMapSize) - floor(uv*vec2(4*shadowMapSize,shadowMapSize));
+		if ( int(floor(uv.x*4*shadowMapSize)) < int(floor(uv.x*4*shadowMapSize+1.0/512.0)) ) frac.x = 0.0;
+		if ( int(floor(uv.y*shadowMapSize)) < int(floor(uv.y*shadowMapSize+1.0/512.0)) ) frac.y = 0.0;
+
+		float ave[25];
+		float y0, y1;
+		
+		for (int m = 0; m <5; m++)
+		{
+			for (int n = 0 ; n <5; n++)
+			{
+				y0 = mix( shadow[n+6+6*m], shadow[n+6*m], frac.y);
+				y1 = mix( shadow[n+7+6*m], shadow[n+1+6*m], frac.y);
+				ave[n+5*m] = mix(y0, y1, frac.x);
+			}
+		}
+		
+		float weight[3];
+		weight[0] = 0.56888889;
+		weight[1] = 0.47862867;
+		weight[2] = 0.23692689;
+
+		 
+		float sum = 0;
+		for (int w = -2; w<3; w++)
+			for (int h = -2; h<3; h++)
+				sum += weight[abs(w)]*weight[abs(h)]*ave[(w+2)+5*(h+2)];
+		
+		sum /= 4.0;
+		
+
+		return sum;//ave[12];
+	}
+	
+}
+*/
+
+float vsm_shadowSample(vec2 uv,  int cascade)
+{
+	highp float moment2 = texture2D(texture14, uv).r;
+	highp float depth = texture2D(texture15, uv).r;
+	
+	highp float moment1 = depth;
+	
+	highp float compare = (transformLight0.z + transformLight0.w)/2.0;
+	
+	if (compare <= moment1) return 1.0;
+	
+	float variance = moment2 - (moment1*moment1);
+	variance = max(variance, .0001);
+	
+	float d = compare - moment1;
+	float p_max = variance / (variance + d*d);
+	
+	
+	//if (compare > moment1) return 0.0;
+	
+	return p_max;
+}
+
+void main()
+{
+	
+	vec2 screen = gl_FragCoord.xy;
+	
+	
+	
+	float dpval[8];
+	int fail = 0;
+	int testDepth[8];
+	
+	float z_b = 0.0;
+	
+	if (samples > 1.0)
+	{
+		for (int n = 0; n<samples; n++)
+			testDepth[n] = 1;
+		
+		for (int i = 0; i < samples; i++)
+		{
+			dpval[i] = texelFetch(texture16, ivec2(screen ), i).r;
+			
+			if (gl_FragCoord.z > dpval[i])
+			{
+				testDepth[i] = 0;
+
+				fail++;
+			}
+		}
+		
+		if (fail == 0)
+		{	
+			for (int i = 0; i <samples; i++)
+			{
+				z_b += dpval[i];
+			}
+			z_b /= samples;
+
+		}
+		if (fail >0)
+		{
+
+			for (int n = 0; n<samples; n++)
+			{
+				if ( testDepth[n] == 1)
+				{
+					z_b += dpval[n];
+				}
+			}
+			z_b /= (samples-fail);
+
+		}
+		
+		if (fail == int(samples))
+			discard;
+	}
+	else
+	{
+		dpval[0] = texture2D(texture10, screen/resolution, 0 ).r;
+			
+		if (gl_FragCoord.z > dpval[0])
+		{
+			discard;
+		}
+		else
+		{
+			z_b = dpval[0];
+		}
+	}
+	
+	float zNear = .1;
+	float zFar = 2500;
+
+	
+	
+
+	
+	// compare depths of opaque and water surface
+	float z_n = 2.0 * z_b - 1.0;
+    float realdep0 = 2.0 * zNear * zFar / (zFar + zNear - z_n * (zFar - zNear));
+	z_b = gl_FragCoord.z;
+    z_n = 2.0 * z_b - 1.0;
+    float realdep1 = 2.0 * zNear * zFar / (zFar + zNear - z_n * (zFar - zNear));
+	
+	float depthdif  = max(0, min(clarity, realdep0-realdep1) );
+	depthdif /= clarity;
+	
+	
+	float dir = dot(normalize(campos-posVarying), normalVarying);
+	
+	vec3 bump = 2*texture(texture1,uvVarying*10+time*.0005).xyz-1;
+		
+	bump = normalize(bump);
+	vec2 distort = .05*(bump.xy);
+	
+	vec3 opaque = texture2D(texture11, screen/resolution+ distort*depthdif*.5).rgb;
+	
+	// if above water...
+	if (dir >= 0)
+	{
+	
+		vec3 bump = 2*texture(texture1,uvVarying*10+time*.0005).xyz-1;
+		
+		bump = normalize(bump);
+		//bump += vec3(snoise(posVarying.xy+time*.0005))/512.;
+		
+		vec2 distort = .05*(bump.xy);
+		
+		bump = TBN*bump;
+		
+		float shadow = 1.0;
+		float dist0 = length(posVarying-cascadeCenter0);
+		
+		if (dist0<10.0)
+		{	
+			shadow = shadowSample(.5*(1+transformLight0.xy)/vec2(4,1), 0);
+			float camdist = length(posVarying-campos);
+			
+			if (dist0>8.0 && camdist>3.0)
+			{
+				float shadow1 = shadowSample(.5*(1+transformLight1.xy)/vec2(4,1)+vec2(.25,0), 1);
+				shadow = mix(shadow, shadow1, .5*(dist0-8.0));
+			}	
+		}
+		else
+		{
+			float dist1 = length(posVarying-cascadeCenter1);
+			if (dist1< 50.0 )
+			{
+				shadow = shadowSample(.5*(1+transformLight1.xy)/vec2(4,1)+vec2(.25,0), 1);
+				
+				if (dist1 > 45.0 )
+				{
+					float shadow1 = shadowSample(.5*(1+transformLight2.xy)/vec2(4,1)+vec2(.5,0), 2);
+					shadow = mix(shadow, shadow1, .2*(dist1-45.0));
+				}
+			}
+			else
+			{
+				float dist2 = length(posVarying-cascadeCenter2);
+				if (dist2 < 200.0 )
+				{
+					shadow = shadowSample(.5*(1+transformLight2.xy)/vec2(4,1)+vec2(.5,0), 2);
+				}	
+				else
+				{
+					float dist3 = length(posVarying-cascadeCenter3);
+					if (dist3 <450.0 )
+					{
+						shadow = shadowSample(.5*(1+transformLight3.xy)/vec2(4,1)+vec2(.75,0), 3);
+					}
+				}
+			}	
+		}
+
+		color.a *= (1.0-dir);
+
+		
+		
+		
+		vec3 bounce_sun = reflect(normalize(vec3(-1)),bump);
+		float spec = dot(normalize(campos-posVarying),bounce_sun);
+		if (spec<0) spec = 0.0;
+		spec = pow(spec, 128);
+		spec *= pow(shadow,2);
+		//if (spec<.0001) spec = .0;
+		
+		spec *= 2*min(1.0,depthdif*16) ;
+
+		vec3 ref = texture2D(texture12, vec2(1,0)+(screen/resolution)*vec2(-1,1) +distort ).rgb;
+
+		depthdif += snoise(uvVarying+screen*vec2(.1234,3.32))/32.0 * depthdif;
+		vec3 tnoise;
+		 tnoise.r = snoise(uvVarying+screen*vec2(.7264,1.82))/64.0  ;
+		 tnoise.g = snoise(uvVarying+screen*vec2(.3456,.7536))/64.0  ;
+		 tnoise.b = snoise(uvVarying+screen*vec2(.5673,.1245))/64.0  ;
+
+		vec3 surfaceColor = mix(vec3(.10,.50,.075)*(.5+.5*shadow), ref, min(1.0, max(0,.95-.75*sqrt(dir))) )+tnoise;
+		float opacity = min(1, (max(0,1-dir)+.9*length(surfaceColor))*1*depthdif+.125*depthdif);
+		
+		color.rgb = mix(opaque, surfaceColor, opacity);
+		
+		
+		//color.rgb = mix(opaque, vec3(.20,.90,.90)*(.5+.5*shadow)-tnoise*min(1.0,depthdif*16.0), max(0.0, .75*pow(dir,.6) * min(1.0, 1.0*pow(depthdif,.3333))) );
+		//color.rgb = mix( color.rgb, ref-tnoise, min(1.0,max(0.0,(1-.15*(dir))*(depthdif)*min(1.2,8.0*depthdif) )) ) ;
+		
+		
+		color.rgb = clamp(color.rgb,0,1)*(1.0-spec)+vec3(1,.9,.8)*spec;
+		
+
+		color.a =1;
+		return;
+	}
+	else
+	{
+		color.rgb = mix(opaque, .5*vec3(.10,.50,.90)*(.75+.25*1.0), .75*pow(1-abs(dir),.6) * min(1.2,1.0*(depthdif)));;
+		color.a = 1;
+		
+		return;
+	}
+	
+	/*
+	float fogHeight = 20.0f;
+	float fog = 0.0;
+	float fog_density = .01;
+	float fog_falloff = .002;
+	if (campos.y < fogHeight)
+	{
+		if (posVarying.y > fogHeight)
+		{
+			float h = abs(campos.y-fogHeight);
+			float angle = dot(normalize(posVarying-campos), vec3(0,1,0));
+			float dist = min(length(campos-posVarying),h/angle);
+			float dir_y = normalize(posVarying-campos).y;
+			fog = max(0, min(1.0,(fog_density*dist-fog_falloff*dir_y*dist)+(fog_density-fog_falloff*campos.y)));
+		}
+		else
+		{
+			float dist = length(campos-posVarying);
+			float dir_y = normalize(posVarying-campos).y;
+			fog = max(0, min(1.0,(fog_density*dist-fog_falloff*dir_y*dist)+(fog_density-fog_falloff*campos.y)));
+		}
+	}
+	else
+	{
+		if (posVarying.y < fogHeight)
+		{
+			float h = abs(campos.y-fogHeight);
+			float angle = dot(normalize(posVarying-campos), vec3(0,-1,0));
+			float dist = length(campos-posVarying)-h/angle;
+			float dir_y = normalize(posVarying-campos).y;
+			fog = max(0, min(1.0,(fog_density*dist-fog_falloff*dir_y*dist)));
+		}
+	}
+	//color.rgb = mix(color.rgb, vec3(1,.5,0), fog*opacity);
+	//color.rgb = vec3(fog);
+	*/
+	//color.rgb = vec3(bounce_sun);
+	
+	//color = vec4(vec3(shadow),1);
+}

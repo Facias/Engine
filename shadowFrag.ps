@@ -1,0 +1,54 @@
+#version 400 core
+layout(location = 0) out vec4 color;
+
+
+in vec3 posVarying;
+in vec2 uvVarying;
+in vec3 normalVarying;
+flat in vec3 normalFlat;
+
+uniform sampler2D texture0;
+
+
+uniform vec4 samples;
+uniform vec4 time;
+uniform float reflectHeight;
+uniform vec3 sunpos;
+uniform vec2 tile;
+
+in vec4 v_position;
+
+highp float snoise(vec2 co)
+{
+    return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
+}
+
+void main()
+{
+	if (posVarying.y <= reflectHeight) discard;
+	
+	//float facing = abs(dot(normalize(vec3(300) - posVarying), normalize(normalVarying)));
+	//gl_FragDepth = gl_FragCoord.z;
+	//if (facing < .05) gl_FragDepth = 1.0;
+
+	vec4 tex = texture2D(texture0, uvVarying*tile.xy*vec2(1,-1)+vec2(0,1));
+	
+	float depth = v_position.z / v_position.w;
+	//depth = max(0.0,min(1.0,100*depth * 5 + .5));
+	
+	float moment = depth *depth;
+	
+	float dx = dFdx(depth);
+	float dy = dFdy(depth);
+	moment += .25*(dx*dx + dy*dy);
+	color.r = (50*dx+.5);
+	color.g = (50*dy+.5); 
+	color.b = dot(normalVarying, vec3(.577));
+	
+	
+	color.a	= tex.a;
+	if (color.a <.125) discard;
+
+	
+	
+}

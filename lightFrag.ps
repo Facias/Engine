@@ -1,0 +1,36 @@
+#version 400 core
+layout(location = 0) out vec4 color;
+
+uniform vec4 vcolor;
+in vec3 posVarying;
+in vec2 uvVarying;
+in vec3 normalVarying;
+uniform vec4 tile;
+
+uniform sampler2D texture0;
+uniform sampler2D texture1;
+
+uniform vec4 samples;
+uniform vec4 time;
+uniform float reflectHeight;
+
+
+
+highp float snoise(vec2 co){
+    return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
+}
+
+void main()
+{
+	if (posVarying.y <= reflectHeight) discard;
+	
+
+	vec4 tex = texture2D(texture0, uvVarying*tile.xy);
+	
+	//
+	color = vcolor*tex;
+	//if (color.a <.2) discard;
+
+	
+	
+}

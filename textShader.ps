@@ -1,0 +1,34 @@
+#version 400 core
+
+in vec2 UV;
+in vec2 pos;
+
+out vec4 color;
+
+uniform sampler2D texture0;
+uniform vec4 vcolor;
+
+uniform vec4 scissor;
+uniform float feather;
+
+
+void main()
+{
+	float alpha = 1.0;
+	if (scissor.z > 1.0 && scissor.w >1.0)
+	{
+		if (pos.x < scissor.x) discard;
+		if (pos.y < scissor.y) discard;
+		if (pos.x > scissor.z) discard;
+		if (pos.y > scissor.w) discard;
+		
+		alpha = min(1.0,(pos.x-scissor.x)/feather);
+		alpha *= min(1.0,(pos.y-scissor.y)/feather);
+		alpha *= min(1.0,abs(pos.x-scissor.z)/feather);
+		alpha *= min(1.0,abs(pos.y-scissor.w)/feather);
+	}
+	vec4 tex = texture2D( texture0, UV );
+	color =  vcolor*vec4(1,1,1,tex.a*alpha);
+
+	
+}

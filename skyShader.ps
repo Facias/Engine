@@ -1,0 +1,61 @@
+#version 400 core
+layout(location = 0) out vec4 color;
+
+uniform vec4 vcolor;
+in vec3 posVarying;
+in vec2 uvVarying;
+in vec3 normalVarying;
+uniform vec4 tile;
+
+uniform sampler2D texture0;
+uniform sampler2D texture1;
+
+uniform vec3 campos;
+
+
+highp float snoise(vec2 co){
+    return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
+}
+
+void main()
+{
+	float up = abs(dot(normalize(posVarying), vec3(0,1,0)));
+	
+	vec3 col = mix(vec3(.2,.5,.8), vec3(.1,.4,.8), up);
+	
+	//color = texture2D(texture0, uvVarying);
+	color = vec4(col,1);
+	float fogHeight = 20.0f;
+	float fog = 0.0;
+	float fog_density = .01;
+	float fog_falloff = .002;
+	if (campos.y < fogHeight)
+	{
+		if (posVarying.y > fogHeight)
+		{
+			float h = abs(campos.y-fogHeight);
+			float angle = dot(normalize(posVarying-campos), vec3(0,1,0));
+			float dist = min(length(campos-posVarying),h/angle);
+			float dir_y = normalize(posVarying-campos).y;
+			fog = max(0, min(1.0,(fog_density*dist-fog_falloff*dir_y*dist)+(fog_density-fog_falloff*campos.y)));
+		}
+		else
+		{
+			float dist = length(campos-posVarying);
+			float dir_y = normalize(posVarying-campos).y;
+			fog = max(0, min(1.0,(fog_density*dist-fog_falloff*dir_y*dist)+(fog_density-fog_falloff*campos.y)));
+		}
+	}
+	else
+	{
+		if (posVarying.y < fogHeight)
+		{
+			float h = abs(campos.y-fogHeight);
+			float angle = dot(normalize(posVarying-campos), vec3(0,-1,0));
+			float dist = length(campos-posVarying)-h/angle;
+			float dir_y = normalize(posVarying-campos).y;
+			fog = max(0, min(1.0,(fog_density*dist-fog_falloff*dir_y*dist)));
+		}
+	}
+	//color.rgb = mix(color.rgb, vec3(1,.5,0), fog);
+}

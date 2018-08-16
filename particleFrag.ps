@@ -1,0 +1,28 @@
+#version 400 core
+layout(location = 0) out vec4 color;
+
+uniform vec4 vcolor;
+in vec3 posVarying;
+in vec2 uvVarying;
+in vec3 normalVarying;
+in vec3 colorVarying;
+uniform vec4 tile;
+
+uniform sampler2D texture0;
+uniform sampler2D texture1;
+
+
+highp float snoise(vec2 co)
+{
+    return fract( sin( dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
+}
+
+void main()
+{
+	
+	
+	color = texture2D(texture0, uvVarying);
+	color.a *= 1.0+textureQueryLod(texture0, uvVarying).x * (2.0/4.0);
+	color.rgb *= colorVarying;
+
+}
