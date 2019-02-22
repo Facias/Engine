@@ -54,7 +54,7 @@ void Editor::Init()
 	selectMeshText[28] = textManager->createText("xx", glm::vec2(0), 18); //rot
 	selectMeshText[29] = textManager->createText("yy", glm::vec2(0), 18); //rot
 	selectMeshText[30] = textManager->createText("zz", glm::vec2(0), 18); //rot
-	selectMeshText[31] = textManager->createText("Texture...", glm::vec2(0), 18); // click to open texture options
+	selectMeshText[31] = textManager->createText(" ", glm::vec2(0), 18); // click to open texture options
 
 	for (int n = 0; n < 31; n++)
 		textManager->setVisible(selectMeshText[n], false);
@@ -90,7 +90,7 @@ void Editor::Init()
 
 	fpsText = textManager->createText("FPS Here", glm::vec2(0), 36);
 
-	textManager->setShaderConst(fpsText, "vcolor", 1, .7, .1, 1);
+	textManager->setShaderConst(fpsText, "vcolor", 1.f, .7f, .1f, 1.f);
 	int vv = textureManager->loadImage("editorGraphics/editorPanel1.png");
 	textureManager->setWrap(vv, false, false);
 
@@ -103,6 +103,7 @@ void Editor::Init()
 	spriteManager->setPosition(editorRibbon[0], glm::vec2(0));
 	spriteManager->setVisible(editorRibbon[0], false);
 
+	
 	// entity ribbon
 	editorRibbon[1] = spriteManager->createSprite(glm::vec2(300, 20));
 	spriteManager->setTexture(editorRibbon[1], defaultTexture, 0);
@@ -154,7 +155,7 @@ void Editor::Init()
 	// make x radial axis reference
 	radial_axis[0] = meshManager->loadMesh("radial_axis.obj");
 	meshManager->meshArray[radial_axis[0]].texture[0] = textureManager->texArray[defaultTexture].id;
-	meshManager->setShaderConst(radial_axis[0], "vcolor", .8, 0, 0, 1);
+	meshManager->setShaderConst(radial_axis[0], "vcolor", .8f, 0.f, 0.f, 1.f);
 	meshManager->meshArray[radial_axis[0]].type = ENGINE::EDITOR;
 	meshManager->meshArray[radial_axis[0]].updateModelMatrix();
 	meshManager->setShader(radial_axis[0], axisShader);
@@ -163,7 +164,7 @@ void Editor::Init()
 	// make y radial axis reference
 	radial_axis[1] = meshManager->loadMesh("radial_axis.obj");
 	meshManager->meshArray[radial_axis[1]].texture[0] = textureManager->texArray[defaultTexture].id;
-	meshManager->setShaderConst(radial_axis[1], "vcolor", 0, .8, 0, 1);
+	meshManager->setShaderConst(radial_axis[1], "vcolor", 0.f, .8f, 0.f, 1.f);
 	meshManager->meshArray[radial_axis[1]].rot = glm::vec3(0, 0, 90);
 	meshManager->meshArray[radial_axis[1]].type = ENGINE::EDITOR;
 	meshManager->meshArray[radial_axis[1]].updateModelMatrix();
@@ -173,7 +174,7 @@ void Editor::Init()
 	// make z radial axis reference
 	radial_axis[2] = meshManager->loadMesh("radial_axis.obj");
 	meshManager->meshArray[radial_axis[2]].texture[0] = textureManager->texArray[defaultTexture].id;
-	meshManager->setShaderConst(radial_axis[2], "vcolor", 0, 0, .8, 1);
+	meshManager->setShaderConst(radial_axis[2], "vcolor", 0.f, 0.f, .8f, 1.f);
 	meshManager->meshArray[radial_axis[2]].rot = glm::vec3(0, 90, 0);
 	meshManager->meshArray[radial_axis[2]].type = ENGINE::EDITOR;
 	meshManager->meshArray[radial_axis[2]].updateModelMatrix();
@@ -184,7 +185,7 @@ void Editor::Init()
 	movebutton_panelSpriteIndex = spriteManager->createSprite(glm::vec2(32, 192));
 	spriteManager->setTexture(movebutton_panelSpriteIndex, defaultTexture, 0);
 	spriteManager->setPosition(movebutton_panelSpriteIndex, glm::vec2(0, 0) + axisControlPanelPos);
-	spriteManager->setColor(movebutton_panelSpriteIndex, glm::vec4(0, 0, 0, .8));
+	spriteManager->setColor(movebutton_panelSpriteIndex, glm::vec4(0.f, 0.f, 0.f, .8f));
 	spriteManager->setVisible(movebutton_panelSpriteIndex, false);
 	spriteManager->setDepth(movebutton_panelSpriteIndex, 10.0f);
 
@@ -334,10 +335,61 @@ void Editor::Init()
 	editHistory = new EditHistory[100];
 	editHistoryStep = 0;
 	editHistoryMax = 0;
+
+	createButton("test", glm::vec2(100), glm::vec2(100));
+	mouseLeftPressed = false;
+	mouseLeftReleased = false;
+
+	createWindow(EDITOR_OPEN_PROJECT);
 }
 
 void Editor::Proc()
 {
+	windowProc(0);
+
+	//if (glfwGetKey(control->window, GLFW_KEY_LEFT_CONTROL))
+	if (!mouseLeftPressed && glfwGetMouseButton(control->window, GLFW_MOUSE_BUTTON_1))
+	{
+		mouseLeftDown = control->cursorPos;
+		mouseLeftPressed = true;
+	}
+
+	if (mouseLeftPressed && !glfwGetMouseButton(control->window, GLFW_MOUSE_BUTTON_1))
+	{
+		mouseLeftUp = control->cursorPos;
+		mouseLeftReleased = true;
+	}
+
+	if (mouseLeftPressed && mouseLeftReleased)
+	{
+		for (int n = 0; n < buttonStack.size; n++)
+		{
+		
+			if (!buttonStack.item[n].isActive)
+				continue;
+
+			glm::vec2 minpos = buttonStack.item[n].pos;
+			glm::vec2 maxpos = buttonStack.item[n].pos + buttonStack.item[n].size;
+
+			if (mouseLeftDown.x > minpos.x && mouseLeftDown.x < maxpos.x)
+				if (mouseLeftDown.y > minpos.y && mouseLeftDown.y < maxpos.y)
+					if (mouseLeftUp.x > minpos.x && mouseLeftUp.x < maxpos.x)
+						if (mouseLeftUp.y > minpos.y && mouseLeftUp.y < maxpos.y)
+							printf("hit\n");
+
+							
+		}
+		
+		mouseLeftDown = glm::dvec2(-10);
+		mouseLeftUp = glm::dvec2(-10);
+		mouseLeftPressed = false;
+		mouseLeftReleased = false;
+	}
+
+	
+
+	//if (selectCount == 1)
+	//	printf("%d \n", meshManager->meshArray[selectedMesh[0]].vertexCount);
 
 	// show all items of the editor interface ******
 	spriteManager->setVisible(move_xy_buttonSpriteIndex, true);
@@ -802,7 +854,7 @@ void Editor::Proc()
 	// import mesh
 	if (glfwGetKey(control->window, GLFW_KEY_LEFT_CONTROL) && glfwGetKey(control->window, GLFW_KEY_I) && !importMeshDialogueOpen)
 	{
-		openImportMeshWindow();
+		//openImportMeshWindow();
 	}
 
 	// while open scene window is open...
@@ -1529,12 +1581,20 @@ void Editor::Proc()
 	{
 		if (glm::length(control->mouseDownPos - control->mouseUpPos) < 10 && control->downTimer > 0 && control->downTimer < 60)
 		{
-			glm::dvec2 pos2 = (2.0*(control->editorCursor / glm::dvec2(windowSize)) - 1.0)*glm::dvec2(1, -1);
+			glm::dvec2 pos2 = (2.0*(control->editorCursor / glm::dvec2(windowSize)) - 1.0)*glm::dvec2(1.0, -1.0);
 			glm::vec3 pos3 = Engine::screenPointToVector(pos2, *mainCamera);
 			pos3 = glm::normalize(pos3);
 			meshManager->raycastAllMeshIgnoreStates(mainCamera->pos, mainCamera->pos + pos3 * 1400.f);
 
 			meshManager->sortRayCastData();
+
+			//printf("%f %f \n", meshManager->raycastDataArray[0].uv.x, meshManager->raycastDataArray[0].uv.y);
+
+			//glm::vec4 soob = meshManager->textureValueFromUV(meshManager->raycastDataArray[0].meshInd,
+			//														meshManager->raycastDataArray[0].uv,
+			//														0);
+
+			//printf(" %f %f %f %f \n", soob.r, soob.g, soob.b, soob.a);
 
 			if (meshManager->raycastHitCount > 0)
 			{
@@ -1546,7 +1606,7 @@ void Editor::Proc()
 						selectedMesh[0] = meshManager->raycastDataArray[0].meshInd;
 						selectCount = 1;
 					}
-					else
+					else if (selectCount < 10)
 					{
 						char already_selected = -1;
 						for (int n = 0; n < selectCount + 1; n++)
@@ -1629,6 +1689,74 @@ void Editor::Proc()
 	{
 		textManager->setString(selectMeshText[1], "None");
 	}
+	
+	// update mesh data
+	// reload object
+	if (selectCount == 1)
+	{
+		if (!loadingMesh)
+		{
+			if (glfwGetKey(control->window, GLFW_KEY_I) && glfwGetKey(control->window, GLFW_KEY_LEFT_CONTROL))
+			{
+				int index = selectedMesh[0];
+				char tempstr[1024];
+				strcpy(tempstr, meshManager->meshArray[index].name);
+				strcat(tempstr, ".obj");
+
+
+				printf("Reloading mesh : %s \n", tempstr);
+				
+				int temp = meshManager->loadMesh(tempstr);
+				
+
+				//meshManager->setTexture(temp, meshManager->meshArray[index].texture[0], 0);
+				//meshManager->setTexture(temp, meshManager->meshArray[index].texture[1], 1);
+				for (int n = 0; n<16; n++)
+					meshManager->meshArray[temp].texture[n] = meshManager->meshArray[index].texture[n];
+
+				meshManager->setShader(temp, meshManager->meshArray[index].shaderIndex);
+
+				meshManager->meshArray[temp].collision = meshManager->meshArray[index].collision;
+				meshManager->meshArray[temp].visible = meshManager->meshArray[index].visible;
+				meshManager->meshArray[temp].culling = meshManager->meshArray[index].culling;
+				meshManager->meshArray[temp].transparent = meshManager->meshArray[index].transparent;
+				meshManager->meshArray[temp].castShadow = meshManager->meshArray[index].castShadow;
+				meshManager->meshArray[temp].lookatCam = meshManager->meshArray[index].lookatCam;
+				meshManager->meshArray[temp].lookatPos = meshManager->meshArray[index].lookatPos;
+				meshManager->meshArray[temp].lookatPosState = meshManager->meshArray[index].lookatPosState;
+				meshManager->meshArray[temp].follow = meshManager->meshArray[index].follow;
+				meshManager->meshArray[temp].reflectable = meshManager->meshArray[index].reflectable;
+				meshManager->meshArray[temp].isWater = meshManager->meshArray[index].isWater;
+
+				meshManager->meshArray[temp].useVertexLight = meshManager->meshArray[index].useVertexLight;
+
+				meshManager->meshArray[temp].pos = meshManager->meshArray[index].pos;
+				meshManager->meshArray[temp].scale = meshManager->meshArray[index].scale;
+				meshManager->meshArray[temp].rot = meshManager->meshArray[index].rot;
+
+				meshManager->meshArray[temp].constantCount = meshManager->meshArray[index].constantCount;
+				meshManager->meshArray[temp].constantMatCount = meshManager->meshArray[index].constantMatCount;
+
+				for (int n = 0; n < meshManager->meshArray[index].constantCount; n++)
+					meshManager->meshArray[temp].constantArray[n] = meshManager->meshArray[index].constantArray[n];
+
+				for (int n = 0; n < meshManager->meshArray[index].constantMatCount; n++)
+					meshManager->meshArray[temp].constantMatArray[n] = meshManager->meshArray[index].constantMatArray[n];
+
+
+				//meshManager->meshArray[index].clear();
+				meshManager->meshArray[index] = meshManager->meshArray[temp];
+				meshManager->meshCount--;
+				selectedMesh[0] = temp;
+				loadingMesh = true;
+				
+			}
+		}
+		if (!glfwGetKey(control->window, GLFW_KEY_I))
+			loadingMesh = false;
+		//meshManager->meshArray[selectedMesh[0]]
+	}
+
 
 	//focus on mesh
 	if (glfwGetKey(control->window, GLFW_KEY_Z) && !glfwGetKey(control->window, GLFW_KEY_LEFT_CONTROL))
@@ -1793,19 +1921,19 @@ void Editor::Proc()
 					lockCam = true;
 					for (int n = 0; n < selectCount; n++)
 					{
-						if (glm::length(hitpos[n] - glm::vec3(-1)) > .01)
+						if (glm::length(hitpos[n] - glm::vec3(-1)) > .01f)
 						{
 							if (move_xy_buttonState)
 							{
-								meshManager->meshArray[selectedMesh[n]].rot.x += .5*(control->cursorPos.y - control->lastCursorPos.y);
+								meshManager->meshArray[selectedMesh[n]].rot.x += .5f*(control->cursorPos.y - control->lastCursorPos.y);
 							}
 							if (move_xz_buttonState)
 							{
-								meshManager->meshArray[selectedMesh[n]].rot.y += .5*(control->cursorPos.y - control->lastCursorPos.y);
+								meshManager->meshArray[selectedMesh[n]].rot.y += .5f*(control->cursorPos.y - control->lastCursorPos.y);
 							}
 							if (move_yz_buttonState)
 							{
-								meshManager->meshArray[selectedMesh[n]].rot.z += .5*(control->cursorPos.y - control->lastCursorPos.y);
+								meshManager->meshArray[selectedMesh[n]].rot.z += .5f*(control->cursorPos.y - control->lastCursorPos.y);
 							}
 							meshManager->meshArray[selectedMesh[n]].updateModelMatrix();
 						}
@@ -1959,7 +2087,7 @@ void Editor::Cleanup()
 
 	for (int n = 0; n < 4; n++)
 		textManager->setVisible(editorMenuText[n], false);
-	for (int n = 0; n < 15; n++)
+	for (int n = 0; n < 31; n++)
 		textManager->setVisible(selectMeshText[n], false);
 	for (int n = 0; n < 4; n++)
 		spriteManager->setVisible(selectMeshPanel[n], false);
@@ -2324,11 +2452,11 @@ void Editor::focusOnMesh(int index)
 	glm::vec3 dir = glm::vec3(.577, .577, -.577);
 	//glm::normalize(mainCamera.pos - meshManager.meshArray[index].pos);
 
-
-	mainCamera->pos = dist * dir + meshManager->meshArray[index].pos;
+	glm::vec3 newpos = (meshManager->meshArray[index].maxpos - meshManager->meshArray[index].minpos) / 2.0f + meshManager->meshArray[index].minpos;
+	mainCamera->pos = dist * dir + newpos;
 	control->position = mainCamera->pos;
 
-	glm::mat4 orientation = Engine::lookat(mainCamera->pos, meshManager->meshArray[index].pos, 0);
+	glm::mat4 orientation = Engine::lookat(mainCamera->pos, mainCamera->pos-dir, 0);
 	mainCamera->forward = -glm::vec3(orientation[0][2], orientation[1][2], orientation[2][2]);
 	mainCamera->right = glm::vec3(orientation[0][0], orientation[1][0], orientation[2][0]);
 	mainCamera->up = glm::vec3(orientation[0][1], orientation[1][1], orientation[2][1]);
@@ -2336,7 +2464,7 @@ void Editor::focusOnMesh(int index)
 	control->direction = mainCamera->forward;
 	control->right = mainCamera->right;
 	control->up = mainCamera->up;
-	control->activeCamera.rot = CameraManager::lookatAngle(*mainCamera, meshManager->meshArray[index].pos);
+	control->activeCamera.rot = CameraManager::lookatAngle(*mainCamera, mainCamera->pos - dir);
 
 	return;
 }
@@ -2354,4 +2482,126 @@ void Editor::updateAxis()
 			meshManager->meshArray[radial_axis[n]].updateModelMatrix();
 		}
 	}
+}
+
+// create window with the given widnowConfig property
+int Editor::createWindow(int prop)
+{
+	EditorWindow temp;
+
+	if (prop == EDITOR_OPEN_PROJECT)
+	{
+		temp.disposition = EDITOR_OPEN_PROJECT;
+		temp.pos = glm::vec2(200, 200);
+		temp.size = glm::vec2(400);
+
+		int tspr;
+		// head
+		tspr = spriteManager->createSprite(glm::vec2(400, 20));
+		spriteManager->setPosition(tspr, temp.pos);
+		spriteManager->setType(tspr, spriteManager->EDITOR);
+		spriteManager->setColor(tspr, glm::vec4(.0, .2, .4, 1.0));
+		temp.spriteList.add(tspr);
+
+		// sides
+		tspr = spriteManager->createSprite(glm::vec2(2, 360));
+		spriteManager->setPosition(tspr, temp.pos + glm::vec2(0,20));
+		spriteManager->setType(tspr, spriteManager->EDITOR);
+		spriteManager->setColor(tspr, glm::vec4(.0, .2, .4, 1.0));
+		temp.spriteList.add(tspr);
+
+		// sides
+		tspr = spriteManager->createSprite(glm::vec2(2, 360));
+		spriteManager->setPosition(tspr, temp.pos + glm::vec2(398, 20));
+		spriteManager->setType(tspr, spriteManager->EDITOR);
+		spriteManager->setColor(tspr, glm::vec4(.0, .2, .4, 1.0));
+		temp.spriteList.add(tspr);
+
+		//body
+		tspr = spriteManager->createSprite(glm::vec2(400, 360));
+		spriteManager->setPosition(tspr, temp.pos + glm::vec2(0,20));
+		spriteManager->setType(tspr, spriteManager->EDITOR);
+		spriteManager->setColor(tspr, glm::vec4(.2, .2, .3, 0.8));
+		temp.spriteList.add(tspr);
+
+		// foot
+		tspr = spriteManager->createSprite(glm::vec2(400, 20));
+		spriteManager->setPosition(tspr, temp.pos + glm::vec2(0,380));
+		spriteManager->setType(tspr, spriteManager->EDITOR);
+		spriteManager->setColor(tspr, glm::vec4(.0, .2, .4, 1.0));
+		temp.spriteList.add(tspr);
+
+		tspr = textManager->createText("Open Project");
+		textManager->setPosition(tspr, glm::vec2(200));
+		textManager->setSize(tspr, 18);
+		textManager->setType(tspr, textManager->EDITOR);
+		temp.textList.add(tspr);
+
+		
+
+		temp.exists = true;
+		temp.visible = true;
+
+		return windowStack.add(temp);
+	}
+
+	if (prop == EDITOR_IMAGE_IMPORT)
+	{
+
+	}
+
+	if (prop == EDITOR_MESH_IMPORT)
+	{
+
+	}
+	
+	if (prop == EDITOR_MESH_EXPORT)
+	{
+
+	}
+
+	if (prop == EDITOR_MESH_PROPERTIES)
+	{
+
+	}
+
+	return -1;
+}
+
+void Editor::windowProc(int windowIndex)
+{
+	EditorWindow *wnd = &windowStack.item[windowIndex];
+	if (wnd->disposition == EDITOR_OPEN_PROJECT)
+	{
+
+		if (wnd->visible)
+		{
+
+			for (int n = 0; n < wnd->spriteList.size; n++)
+				drawReqStack.add(DrawRequest(wnd->spriteList.item[n], EDITOR_SPRITE));
+			for (int n = 0; n < wnd->textList.size; n++)
+				drawReqStack.add(DrawRequest(wnd->textList.item[n], EDITOR_TEXT));
+
+			for (int n = 0; n < wnd->buttonList.size; n++)
+				drawReqStack.add(DrawRequest(wnd->buttonList.item[n], EDITOR_BUTTON));
+			
+		}
+
+	}
+
+}
+
+int Editor::createButton(char *str, glm::vec2 pos, glm::vec2 size)
+{
+	EditorButton temp;
+	temp.SpriteID[0] = spriteManager->createSprite(size);
+	spriteManager->setPosition(temp.SpriteID[0], pos);
+	spriteManager->setColor(temp.SpriteID[0], glm::vec4(.5, .5, .5, 1));
+	spriteManager->setType(temp.SpriteID[0], EDITOR);
+
+	temp.textID = textManager->createText(str);
+	textManager->setPosition(temp.textID, pos);
+	textManager->setType(temp.textID, EDITOR);
+
+	return buttonStack.add(temp);
 }

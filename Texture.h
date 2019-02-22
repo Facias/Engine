@@ -1,7 +1,9 @@
 #ifndef TEXTURE_H_
 #define TEXTURE_H_
 
-#define _CRT_SECURE_NO_WARNINGS
+#ifndef _CRT_SECURE_NO_WARNINGS
+	#define _CRT_SECURE_NO_WARNINGS
+#endif
 
 #include <glew.h>
 #include "Stack.h"
@@ -17,7 +19,7 @@ namespace ENGINE
 		TextureObj(const TextureObj &other);
 		
 		GLint id;
-		char name[512];
+		char name[128];
 		bool wrapU;
 		bool wrapV;
 		bool magFilter;
@@ -38,6 +40,7 @@ namespace ENGINE
 			size = glm::ivec2(1);
 			mipmap = false;
 		}
+
 		RenderTexture(const RenderTexture &other)
 		{
 			fbo = other.fbo;
@@ -72,6 +75,7 @@ namespace ENGINE
 			size = glm::ivec2(1);
 			mipmap = false;
 		}
+
 		GBuffer(const GBuffer &other)
 		{
 			fbo = other.fbo;
@@ -109,7 +113,10 @@ namespace ENGINE
 			texArray = new TextureObj[16];
 			texCount = 0;
 			arraySize = 16;
+
+			blank = loadImage("white.png");
 		}
+
 		TextureObj *texArray;
 		unsigned short int arraySize;
 		unsigned short int texCount;
@@ -124,6 +131,9 @@ namespace ENGINE
 		RenderTexture createRenderTexture(int width, int height, bool mipmapping);
 		RenderTexture createRenderTextureMultisample(int width, int height, int samples);
 		GBuffer createGBuffer(int width, int height);
+
+		// default, white texture for standard asset creation
+		int blank;
 	};
 }
 

@@ -1,35 +1,61 @@
+#ifndef _CRT_SECURE_NO_WARNINGS
+	#define _CRT_SECURE_NO_WARNINGS
+#endif
+
 #ifndef MESH_OBJ_H_
 #define MESH_OBJ_H_
 
-#define _CRT_SECURE_NO_WARNINGS
+struct VertexData;
 
 #include "glm.hpp"
 #include <glew.h>
 #include "Shader.h"
-#include "Stack.h"
+
 #include "Texture.h"
 #include "Camera.h"
 
 
+#include "Octree.h"
+
+
+
+
 namespace ENGINE
 {
+
+	struct MeshFileData
+	{
+		MeshFileData()
+		{
+			vertColors = false;
+		}
+
+		Stack < VertexData > vertexData;
+
+		bool vertColors;
+		glm::vec3 maxpos;
+		glm::vec3 minpos;
+	};
+
+	struct PackedVertex
+	{
+		glm::vec3 position;
+		glm::vec2 uv;
+		glm::vec3 normal;
+		glm::vec3 color;
+		glm::vec3 tangent;
+		glm::vec3 binormal;
+		bool operator<(const PackedVertex that) const
+		{
+			return memcmp((void*)this, (void*)&that, sizeof(PackedVertex)) > 0;
+		}
+	};
+
 	enum mesh_type
 	{
 		STANDARD,
 		QUAD,
 		EDITOR
-	};
-	
-	struct MeshFileData
-	{
-		Stack < glm::vec3 > vertices;
-		Stack < glm::vec2 > uvs;
-		Stack < glm::vec3 > normals;
-		Stack < glm::vec3 > colors;
-		Stack < glm::vec3 > tangents;
-
-		glm::vec3 maxpos;
-		glm::vec3 minpos;
 	};
 
 	struct MeshObj
@@ -44,7 +70,7 @@ namespace ENGINE
 
 		//indexed
 		//std::vector<unsigned short> indices;
-		Stack<unsigned short> indices;
+		Stack<unsigned int> indices;
 		Stack<glm::vec3> ind_vertex;
 		Stack<glm::vec2> ind_uv;
 		Stack<glm::vec3> ind_normal;
@@ -80,6 +106,8 @@ namespace ENGINE
 		char vertexLightBounces;
 		bool useIndirectDirection;
 		bool frustumCulled;
+		unsigned int vertexCount;
+
 		// 0 = not sampled, 1 = sampled & up to date, 2 = sampled & outdated
 		char vertexLightSampleState;
 		bool useTangents = false;
@@ -95,7 +123,9 @@ namespace ENGINE
 		glm::vec3 minpos;
 		glm::vec3 maxpos;
 
+		int texIndex[24];
 		GLint texture[24];
+
 		//Shader shader;
 		// keep position of shader in the case that shaders are remapped
 		// to new memory locations
@@ -104,12 +134,9 @@ namespace ENGINE
 		int constantArraySize;
 		int constantCount;
 
-
 		ShaderMat constantMatArray[32];
 		int constantMatCount;
 		void setShaderMat(Shader *shader, char *name, glm::mat4 val);
-
-		
 
 		// if this is an instance of another object
 		// we need to process it differently when rendering.
@@ -126,7 +153,6 @@ namespace ENGINE
 
 		glm::mat4 updateModelMatrix();
 		glm::mat4 updateModelMatrix(glm::mat4 transform);
-
 
 		void setVisible(bool state);
 		bool getVisible();
@@ -186,6 +212,8 @@ namespace ENGINE
 		glm::mat4 lookat(glm::vec3 lookatpos, float z_rotation);
 
 		void getTangents();
+
+		void clear();
 	};
 
 	struct CollisionData
@@ -195,6 +223,7 @@ namespace ENGINE
 			raylength = 0.0f;
 			pos = glm::vec3(0);
 			norm = glm::vec3(0);
+			uv = glm::vec2(0);
 			meshInd = -1;
 		}
 		CollisionData( const CollisionData &other)
@@ -202,6 +231,7 @@ namespace ENGINE
 			raylength = other.raylength;
 			pos = other.pos;
 			norm = other.norm;
+			uv = other.uv;
 			meshInd = other.meshInd;
 		}
 		CollisionData(float len, glm::vec3 p, glm::vec3 n)
@@ -215,6 +245,7 @@ namespace ENGINE
 		float raylength;
 		glm::vec3 pos;
 		glm::vec3 norm;
+		glm::vec2 uv;
 		short int meshInd;
 	};
 
@@ -222,8 +253,8 @@ namespace ENGINE
 	{
 		MeshManager()
 		{
-			meshArray = new MeshObj[25600];
-			arraySize = 25600;
+			meshArray = new MeshObj[256];
+			arraySize = 256;
 			meshCount = 0;
 			
 			defaultShader = NULL;
@@ -237,7 +268,7 @@ namespace ENGINE
 			int spherecastHitCount = 0;
 			int spherecastArraySize = 16;
 
-
+			indexTree = Octree<VertexData>(6);
 
 			static const GLfloat g_quad_vertex_buffer_data[] = {
 				-1.0f, -1.0f, 0.0f,
@@ -271,6 +302,7 @@ namespace ENGINE
 			raycastDataArray = other.raycastDataArray;
 			int raycastHitCount = other.raycastHitCount;
 			int raycastArraySize = other.raycastArraySize;
+
 		}
 		int lastGivenID;
 		int assignID(int index);
@@ -334,10 +366,15 @@ namespace ENGINE
 		bool raycastAllMeshIgnoreStates(glm::vec3 p0, glm::vec3 p1); 
 		bool spherecastMesh(int id, glm::vec3 center, float radius);
 		bool spherecastAllMesh( glm::vec3 center, float radius);
-		bool raycastTriangle(glm::vec3 p0, glm::vec3 p1, glm::vec3 v0, glm::vec3 v1, glm::vec3 v2);
-		bool spherecastTriangle(glm::vec3 center, float radius, glm::vec3 v0, glm::vec3 v1, glm::vec3 v2);
+		bool raycastTriangle( glm::vec3 p0, glm::vec3 p1, glm::vec3 v0, glm::vec3 v1, glm::vec3 v2);
+		bool spherecastTriangle( glm::vec3 center, float radius, glm::vec3 v0, glm::vec3 v1, glm::vec3 v2);
 		glm::vec3 resolveSphereSlide();
 		
+		//glm::vec2 PosToUV(int id, glm::vec3 pos);
+		glm::vec3 interpolateTriangle(glm::vec3 v0, glm::vec3 v1, glm::vec3 v2, glm::vec3 p);
+		glm::vec4 textureValueFromUV(int id, glm::vec2 uv, int texid);
+
+
 		int raycast_index[3];
 		int indexCount;
 		glm::vec3 raycast_vert[3];
@@ -349,9 +386,12 @@ namespace ENGINE
 		glm::vec3 sampleSphereCenter;
 		float sampleSphereRadius;
 
+		// ray cast data & management
 		CollisionData *raycastDataArray;
 		int raycastHitCount;
 		int raycastArraySize;
+
+		// sphere cast data & management
 		CollisionData *spherecastDataArray;
 		int spherecastHitCount;
 		int spherecastArraySize;
@@ -375,6 +415,8 @@ namespace ENGINE
 		void setShader(unsigned int meshIndex, unsigned int shaderIndex);
 
 		void setShaderConst(int meshIndex, char *name, float v0, float v1, float v2, float v3);
+		void setShaderConst(int meshIndex, char *name, int v0, int v1, int v2, int v3);
+		
 		void setShaderMat(int meshIndex, char *name, glm::mat4 val);
 
 		// shaders need to be index values. Not pointers
@@ -386,6 +428,19 @@ namespace ENGINE
 		TextureManager *textureManager;
 
 		void frustumCull(Camera cam, glm::mat4 proj, glm::vec2 res);
+
+
+		Octree<VertexData> indexTree;
+
+		void indexVBO(
+			MeshFileData in_data,
+
+			Stack<unsigned int> & out_indices,
+			Stack<glm::vec3> & out_vertices,
+			Stack<glm::vec2> & out_uvs,
+			Stack<glm::vec3> & out_normals,
+			Stack<glm::vec3> & out_colors
+		);
 	};
 
 

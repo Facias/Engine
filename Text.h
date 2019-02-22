@@ -1,14 +1,21 @@
+#ifndef _CRT_SECURE_NO_WARNINGS
+	#define _CRT_SECURE_NO_WARNINGS
+#endif
+
 #ifndef TEXT2D_H_
 #define TEXT2D_H_
 
-#define _CRT_SECURE_NO_WARNINGS
+
 
 #include "glm.hpp"
 #include "Texture.h"
 #include "Shader.h"
+#include <string>
+
 
 namespace ENGINE
 {
+	struct TextManager;
 
 	struct Font
 	{
@@ -35,19 +42,10 @@ namespace ENGINE
 
 	struct TextObj
 	{
-		TextObj()
-		{
-			//vertices = new glm::vec2[256];
-			//UVs = new glm::vec2[256];
-			//str = new char[256];
-			size = 36.0f;
-			constantCount = 0;
-			visible = true;
-			color = glm::vec4(1);
-			depth = 9.9f;
-		}
+		TextObj();
 		TextObj(const TextObj &other)
 		{
+			type = other.type;
 			//char temp[1024];
 			//strcpy(temp, other.str);
 			strcpy(str, other.str);
@@ -61,6 +59,10 @@ namespace ENGINE
 			depth = other.depth;
 		}
 
+		// a type of EDITOR will only be
+		// rendered when the editor is open
+		char type;
+		
 		char str[256];
 		glm::vec2 pos;
 		glm::vec4 color;
@@ -79,6 +81,13 @@ namespace ENGINE
 	{
 		TextManager();
 		void init();
+
+		enum
+		{
+			STANDARD,
+			EDITOR
+		};
+
 
 		TextObj *textArray;
 		unsigned short int textCount;
@@ -100,6 +109,7 @@ namespace ENGINE
 		void setDepth(int index, float depth);
 		void setScissor(int index, glm::vec2 p0, glm::vec2 p1);
 		void setFeather(int index, float feather);
+		void setType(int index, char tp);
 
 		bool getVisible(int index);
 		glm::vec4 getColor(int index);
@@ -107,6 +117,7 @@ namespace ENGINE
 		glm::vec2 getPosition(int index);
 		float getDepth(int index);
 		char *getString(int index);
+		char getType(int index);
 		
 		void draw(int index);
 

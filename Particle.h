@@ -6,7 +6,7 @@
 #include <glew.h>
 #include "Shader.h"
 #include "Stack.h"
-#include "VBOIndexer.h"
+
 
 namespace ENGINE
 {

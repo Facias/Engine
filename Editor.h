@@ -2,9 +2,10 @@
 #define EDITOR_H_
 
 #include "Stack.h"
+#include "Queue.h"
 #include "glm.hpp"
 
-#include "Text2D.h"
+#include "Text.h"
 #include "Mesh.h"
 #include "Texture.h"
 #include "Shader.h"
@@ -16,17 +17,116 @@
 
 	struct EditHistory;
 
+	// use this to tell the engine to draw specific entity
+	// when it is ready to do so
+	struct DrawRequest
+	{
+		DrawRequest()
+		{
+			index = 0;
+			type = 0;
+		}
+		DrawRequest(int ind, char tp)
+		{
+			index = ind;
+			type = tp;
+		}
+		DrawRequest(DrawRequest &other)
+		{
+			index = other.index;
+			type = other.type;
+		}
+		int index;
+		char type;
+	};
+
+	struct EditorWindow
+	{
+		Stack <int> textList;
+		Stack <int> spriteList;
+		Stack <int> buttonList;
+		
+		// the disposition value will determine the layout 
+		// and functionality of the window
+		short int disposition;
+		glm::vec2 pos;
+		glm::vec2 size;
+
+
+		bool exists;
+		bool visible;
+	};
+
+	struct EditorButton
+	{
+		EditorButton()
+		{
+			pos = glm::vec2(100);
+			size = glm::vec2(100);
+
+			exists = true;
+			isActive = true;
+			pressed = false;
+			visible = true;
+		}
+
+		EditorButton(glm::vec2 button_pos, glm::vec2 button_size )
+		{
+
+			pos = button_pos;
+			size = button_size;
+
+			exists = true;
+			isActive = true;
+			pressed = false;
+			visible = true;
+		}
+
+		int textID;
+		int SpriteID[2];
+
+		// if the button is no longer in use, 
+		// the exists flag should be set to false.
+		// This will tell the button manager to over-write
+		// the location if a new button is created
+		bool exists;
+		
+		// active buttons can be interacted with
+		// inactivity should be indicated visually
+		// with faded text and panel graphics
+		bool isActive;
+		bool visible;
+		
+		// button should remain pressed until 
+		// its purpose has been acounted for
+		bool pressed;
+
+		glm::vec2 pos;
+		glm::vec2 size;
+	};
+
+
 
 	struct Editor
 	{
+
 		Editor()
 		{};
 
+		ENGINE::MeshManager *meshManager;
 		ENGINE::TextManager *textManager;
 		ENGINE::SpriteManager *spriteManager;
-		ENGINE::MeshManager *meshManager;
 		ENGINE::TextureManager *textureManager;
 		ENGINE::ShaderManager *shaderManager;
+
+		
+		enum type
+		{
+			EDITOR_TEXT,
+			EDITOR_SPRITE,
+			EDITOR_GEOMETRY,
+			EDITOR_BUTTON
+		};
 
 		int defaultTexture = 0;
 		int defaultShader = 0;
@@ -36,7 +136,7 @@
 		Camera *mainCamera;
 		Controls *control;
 
-		glm::vec2 windowSize; // not being set
+		glm::vec2 windowSize; 
 
 
 		void Init();
@@ -45,8 +145,33 @@
 
 		int fpsText;
 
+		// mouse input
+		glm::dvec2 mouseLeftDown;
+		glm::dvec2 mouseLeftUp;
+		bool mouseLeftPressed;
+		bool mouseLeftReleased;
+		int mouseLeftPressTime;
+
 		// editor stuff
 		glm::vec2 axisControlPanelPos;
+
+		Stack <EditorButton> buttonStack;
+		Stack <EditorWindow> windowStack;
+		enum windowConfig
+		{
+			EDITOR_OPEN_PROJECT,
+			EDITOR_IMAGE_IMPORT,
+			EDITOR_MESH_IMPORT,
+			EDITOR_MESH_EXPORT,
+			EDITOR_MESH_PROPERTIES
+		};
+		int createWindow(int prop);
+		void windowProc(int windowIndex);
+		void closeWindow(int windowIndex);
+		Queue <DrawRequest> drawReqStack;
+		//buttons
+		int createButton(char *str, glm::vec2 pos, glm::vec2 size);
+		
 
 		int selectedMesh[10];
 		// number of entities selected
@@ -125,6 +250,8 @@
 
 		int editorRibbon[4];
 
+		bool loadingMesh;
+
 		// editor camera functions
 		void focusOnMesh(int index);
 		bool startMove;
@@ -151,6 +278,8 @@
 		int move_yz_buttonSpriteIndex;
 		bool move_screen_buttonState;
 		int move_screen_buttonSpriteIndex;
+
+		
 	};
 
 	struct EditHistory

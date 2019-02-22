@@ -343,10 +343,13 @@ GLint Shader::getUniformLocation(char *name)
 	{
 		//if (uniformName[n] != NULL)
 		{
-			int a = strcmp(name, uniformName[n]);
-			if (a == 0) // uniform exists
+			if (strlen(name) == strlen(uniformName[n]))
 			{
-				return uniformLocation[n];
+				int a = strcmp(name, uniformName[n]);
+				if (a == 0) // uniform exists
+				{
+					return uniformLocation[n];
+				}
 			}
 		}
 	}
@@ -360,10 +363,13 @@ unsigned char Shader::getUniformType(char *name)
 	{
 		if (uniformName[n] != NULL)
 		{
-			int a = strcmp(name, uniformName[n]);
-			if (a == 0) // uniform exists
+			if (strlen(name) == strlen(uniformName[n]))
 			{
-				return uniformType[n];
+				int a = strcmp(name, uniformName[n]);
+				if (a == 0) // uniform exists
+				{
+					return uniformType[n];
+				}
 			}
 		}
 	}
@@ -433,14 +439,6 @@ int ShaderManager::add(Shader shader)
 	return shaderCount-1;
 }
 
-void ShaderManager::setMultisampleState(float ms)
-{
-	for (int n = 0; n < shaderCount; n++)
-	{
-		//shaderArray[n].getTextureLocations(ms);
-	}
-	//samples = ms;
-}
 
 void ShaderManager::remove(int index)
 {

@@ -5,6 +5,9 @@
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 double deltaScroll;
 
+#undef min
+#undef max
+
 Controls::Controls()
 {
 	// position
@@ -18,9 +21,9 @@ Controls::Controls()
 
 	acceleration = .15;
 	friction = .25;
-	topspeed = .25;
-	topspeed_walk = .25;
-	topspeed_run = 1.3;
+	topspeed = .125;
+	topspeed_walk = .125;
+	topspeed_run = 2.3;
 	speed = .0f; // 3 units / second
 	mouseSpeed = 0.5f;
 
@@ -193,16 +196,16 @@ void Controls::update()
 	if (!editorMode)
 	{
 		
-		activeCamera.rot.y += mouseSpeed  * -(float(blendMouse.x) / 270.0);
-		activeCamera.rot.x += mouseSpeed  * -(float(blendMouse.y) / 270.0);
+		activeCamera.rot.y += mouseSpeed  * -(float(blendMouse.x) / 270.0f);
+		activeCamera.rot.x += mouseSpeed  * -(float(blendMouse.y) / 270.0f);
 
 	}
 	else
 	{
 		if (!lockCam && !grabbingState)
 		{
-			activeCamera.rot.y += mouseSpeed  * -(float(blendMouse.x) / 50);
-			activeCamera.rot.x += mouseSpeed  * -(float(blendMouse.y) / 50);
+			activeCamera.rot.y += mouseSpeed  * -(float(blendMouse.x) / 50.f);
+			activeCamera.rot.x += mouseSpeed  * -(float(blendMouse.y) / 50.f);
 		}
 	}
 	activeCamera.rot.x = glm::min(glm::radians(89.0f), glm::max(-glm::radians(89.0f), activeCamera.rot.x));
@@ -272,11 +275,11 @@ void Controls::update()
 
 	if (run)
 	{
-		if (topspeed < topspeed_run) topspeed += .025;
+		if (topspeed < topspeed_run) topspeed += .025f;
 	}
 	else
 	{
-		if (topspeed > topspeed_walk) topspeed -= .025;
+		if (topspeed > topspeed_walk) topspeed -= .025f;
 	}
 
 

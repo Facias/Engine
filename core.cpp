@@ -1,5 +1,6 @@
-#define _WINSOCK_DEPRECATED_NO_WARNINGS
-
+#ifndef _WINSOCK_DEPRECATED_NO_WARNINGS
+	#define _WINSOCK_DEPRECATED_NO_WARNINGS
+#endif
 
 #include <WinSock2.h>
 #include <Windows.h>
@@ -24,10 +25,10 @@
 
 #include "controls.h"
 #include "EngineMain.h"
-#include "VBOIndexer.h"
+
 #include "Shader.h"
 #include "Texture.h"
-#include "Text2D.h"
+#include "Text.h"
 
 
  
@@ -40,22 +41,14 @@ int main()
 		return -1;
 	}
 
-	glEnable(GL_ARB_sample_shading);
-	glEnable(GL_MULTISAMPLE);
-	glEnable(GL_MULTISAMPLES_NV);
-	glDisable(GL_STENCIL_TEST);
-	//glfwWindowHint(GL_MULTISAMPLE_FILTER_HINT_NV, GL_DONT_CARE);
-
-	// polygon smoothing seems to be causing render gaps between triangles?
-	glDisable(GL_POLYGON_SMOOTH);
 
 
-	glfwWindowHint(GLFW_SAMPLES, 8.0); // backbuffer ms antialiasing only
+	glfwWindowHint(GLFW_SAMPLES, 8); // backbuffer ms antialiasing only
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3); // We want OpenGL 3.3
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // To make MacOS happy; should not be needed
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE); // We don't want the old OpenGL 
-	
+
 	int monitorCount = 0;
 	GLFWmonitor **monitor = glfwGetMonitors(&monitorCount);
 					
@@ -78,7 +71,7 @@ int main()
 	}
 	
 	
-	glfwSetWindowPos(window, 500, 200);
+	glfwSetWindowPos(window, 300, 150);
 
 	/*
 	int monitorPosX, monitorPosY;
@@ -98,10 +91,19 @@ int main()
 	glViewport(monitorPosX, monitorPosY, window_width, window_height);
 	*/
 
+	glEnable(GL_ARB_sample_shading);
+	glEnable(GL_MULTISAMPLE);
+	glEnable(GL_MULTISAMPLES_NV);
+	glDisable(GL_STENCIL_TEST);
+	//glfwWindowHint(GL_MULTISAMPLE_FILTER_HINT_NV, GL_DONT_CARE);
 
+	// polygon smoothing seems to be causing render gaps between triangles?
+	glDisable(GL_POLYGON_SMOOTH);
+	glHint(GL_POLYGON_SMOOTH_HINT, GL_FASTEST);
 
 	// Enable depth test
 	glEnable(GL_DEPTH_TEST);
+
 	// Accept fragment if it closer to the camera than the former one
 	glDepthFunc(GL_LESS);
 
@@ -112,27 +114,10 @@ int main()
 
 	
 	glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE_ARB);
-	//glEnable(GL_SAMPLE_ALPHA_TO_ONE);
 
-	
-	glClearColor(.25,.5,.85,0);
 	glClearColor(0, 0, 0, 0);
-	
-	
-	
-	
 
 	engine.window = window;
-	// Enable blending
-	//glEnable(GL_BLEND);
-	//glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	//glDisable(GL_DEPTH_TEST);
-	
-	//glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-	
-
-	// Initialize our little text library with the Holstein font
-
 
 	engine.init();
 

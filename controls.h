@@ -5,6 +5,7 @@
 #include <glfw3.h>
 #include "Camera.h"
 
+#include <dinput.h>
 
 struct KeyState
 {
@@ -25,7 +26,7 @@ struct KeyState
 
 struct Controls
 {
-		
+	IDirectInput *dinput;
 	Controls::Controls();
 
 	void typeInput();

@@ -1,7 +1,10 @@
+
+#ifndef _CRT_SECURE_NO_WARNINGS
+	#define _CRT_SECURE_NO_WARNINGS
+#endif
+
 #ifndef SHADER_H_
 #define SHADER_H_
-
-#define _CRT_SECURE_NO_WARNINGS
 
 #include <glew.h>
 #include "glm.hpp"
@@ -186,7 +189,7 @@ namespace ENGINE
 		void remove(int index);
 		
 		float samples;
-		void setMultisampleState(float samples);
+		//void setMultisampleState(float samples);
 
 		// return the index of the shader in array
 		int loadShader(char *vertex, char* fragment); 

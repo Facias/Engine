@@ -1,21 +1,20 @@
-#ifndef STACK_H_
-#define STACK_H_
+#ifndef QUEUE_H_
+#define QUEUE_H_
 
-typedef unsigned int uint;
 
 template <typename T>
-struct Stack
+struct Queue
 {
-	Stack()
+	Queue()
 	{
 		item = new T[16];
 		maxSize = 16;
 		size = 0;
-		
+
 	}
 
 
-	Stack(int s)
+	Queue(int s)
 	{
 		item = new T[s];
 		maxSize = s;
@@ -23,7 +22,7 @@ struct Stack
 
 	}
 
-	Stack(const Stack &other, bool deep)
+	Queue(const Queue &other, bool deep)
 	{
 		maxSize = other.maxSize;
 		size = other.size;
@@ -31,9 +30,6 @@ struct Stack
 		for (uint n = 0; n < size; n++)
 			item[n] = other.item[n];
 	}
-
-
-
 
 	T *item;
 	unsigned int maxSize;
@@ -46,31 +42,17 @@ struct Stack
 		size = 0;
 	}
 
-
-	// WRONG
-	Stack add(Stack &other)
+	static Queue add(Queue &queue0, Queue &queue1)
 	{
-		Stack temp;
-		temp.size = size + other.size;
-		temp.maxSize = maxSize + other.maxSize;
+		Queue temp;
+		temp.size = queue0.size + queue1.size;
+		temp.maxSize = queue0.maxSize + queue1.maxSize;
 		temp.item = new T[temp.maxSize];
-		for (int n = 0; n < maxSize; n++)
-			temp.item[n] = item[n];
-		for (int n = 0; n < other.size; n++)
-			temp.item[n] = other.item[n];
-	}
+		for (uint n = 0; n < queue0.size; n++)
+			temp.item[n] = queue0.item[n];
+		for (uint n = 0; n < queue1.size; n++)
+			temp.item[n + queue0.size] = queue1.item[n];
 
-	static Stack add(Stack &stack0, Stack &stack1)
-	{
-		Stack temp;
-		temp.size = stack0.size + stack1.size;
-		temp.maxSize = stack0.maxSize + stack1.maxSize;
-		temp.item = new T[temp.maxSize];
-		for (uint n = 0; n < stack0.size; n++)
-			temp.item[n] = stack0.item[n];
-		for (uint n = 0; n < stack1.size; n++)
-			temp.item[n+stack0.size] = stack1.item[n];
-		
 
 		return temp;
 	}
@@ -94,8 +76,20 @@ struct Stack
 		size++;
 		return size - 1;
 	}
+
+	T pop()
+	{
+		T remove = item[0];
+		for (int n = 0; n < size - 1; n++)
+		{
+			item[n] = item[n + 1];
+		}
+		size--;
+		return remove;
+
+	}
+
+
 };
-
-
 
 #endif

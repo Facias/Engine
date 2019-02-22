@@ -6,26 +6,23 @@ using namespace ENGINE;
 int SpriteManager::createSprite(glm::vec2 sz)
 {
 	Sprite temp;
-	temp.vert[0] = glm::vec2(-.5f);
-	temp.vert[1] = glm::vec2(.5f, -.5f);
-	temp.vert[2] = glm::vec2(.5f, .5f);
-	temp.vert[3] = glm::vec2(-.5f);
-	temp.vert[4] = glm::vec2(.5f, .5f);
-	temp.vert[5] = glm::vec2(-.5f, .5f);
+
 
 	temp.shader = &shaderManager->shaderArray[defaultSpriteShaderID];
 	temp.shaderIndex = defaultSpriteShaderID;
+	temp.texIndex[0] = textureManager->blank;
+	temp.texture[0] = textureManager->texArray[temp.texIndex[0]].id;
 
 	temp.setShaderConst("vcolor", 1, 1, 1, 1);
 
 	temp.size = sz;
-	temp.setShaderConst("resolution", 960, 540, 0, 0);
+	temp.setShaderConst("resolution", res.x, res.y, 0, 0);
 	temp.setShaderConst("size", sz.x, sz.y, 0, 0);
 
 	glGenBuffers(1, &temp.vertBufferID);
 
 	glBindBuffer(GL_ARRAY_BUFFER, temp.vertBufferID);
-	glBufferData(GL_ARRAY_BUFFER, 6 * sizeof(glm::vec2), &temp.vert[0], GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, 6 * sizeof(glm::vec2), &vert[0], GL_STATIC_DRAW);
 
 	int n = add(temp);
 	setScissor(n, glm::vec2(0), glm::vec2(0));
@@ -173,10 +170,11 @@ void SpriteManager::setFeather(int index, float feather)
 	spriteArray[index].setShaderConst("feather", feather,0,0,0);
 }
 
-void SpriteManager::setTexture(int index, int texArrayInd, int texIndex)
+// set the texture array index value and the texture id directly
+void SpriteManager::setTexture(int index, int texArrayInd, int texSlot)
 {
-	TextureObj p = textureManager->texArray[texArrayInd];
-	spriteArray[index].texture[texIndex] = p.id;
+	spriteArray[index].texIndex[texSlot] = texArrayInd;
+	spriteArray[index].texture[texSlot] = textureManager->texArray[texArrayInd].id;
 }
 
 void SpriteManager::setVisible(int index, bool state)
@@ -195,6 +193,13 @@ void SpriteManager::setDepth(int index, float depth)
 {
 	spriteArray[index].depth = depth;
 
+	return;
+}
+
+void SpriteManager::setType(int index, char tp)
+{
+	spriteArray[index].type = tp;
+	
 	return;
 }
 
@@ -222,6 +227,7 @@ glm::vec4 SpriteManager::getColor(int index)
 
 int SpriteManager::getTexture(int index, int texIndex)
 {
+
 	return spriteArray[index].texture[texIndex];
 }
 
@@ -243,6 +249,11 @@ float SpriteManager::getAngle(int index)
 glm::vec2 SpriteManager::getSize(int index)
 {
 	return spriteArray[index].size;
+}
+
+char SpriteManager::getType(int index)
+{
+	return spriteArray[index].type;
 }
 
 void SpriteManager::sort()

@@ -551,6 +551,8 @@ void SceneScript::parseFile(char *name)
 			if (entityArray[entityCount - 1].texAssigned[1]) printf("%s \n", entityArray[entityCount - 1].texName[1]);
 		}
 	}
+
+	fclose(file);
 }
 
 bool EntityEntry::operator ==(EntityEntry &other)

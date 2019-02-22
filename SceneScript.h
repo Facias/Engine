@@ -1,7 +1,9 @@
+#ifndef _CRT_SECURE_NO_WARNINGS
+	#define _CRT_SECURE_NO_WARNINGS
+#endif
+
 #ifndef SCENE_SCRIPT_H_
 #define SCENE_SCRIPT_H_
-
-#define _CRT_SECURE_NO_WARNINGS
 
 #include "glm.hpp"
 
@@ -58,8 +60,8 @@ namespace ENGINE
 		SceneScript()
 		{
 			entityCount = 0;
-			entityArray = new EntityEntry[32];
-			arraySize = 32;
+			entityArray = new EntityEntry[64];
+			arraySize = 64;
 			skipping = false;
 		}
 		void parseFile(char *name);

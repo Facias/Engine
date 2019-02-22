@@ -12,15 +12,17 @@
 
 
 #include "Texture.h"
-#include "Text2D.h"
+#include "Text.h"
 #include "Shader.h"
-#include "VBOIndexer.h"
+
 
 
 #undef max
 #undef min
 
 using namespace ENGINE;
+
+
 
 void Engine::init()
 {
@@ -29,6 +31,8 @@ void Engine::init()
 
 	sorting2DArray = new SortItem2D[8];
 
+	sunpos = glm::vec3(-100000.f, -20000.f, 0.f);
+	sundir = glm::normalize(sunpos);
 
 
 	/*
@@ -58,8 +62,8 @@ void Engine::init()
 
 	for (int n = 0; n < 16; n++)
 		textureStateID[n] = -2;
-	int a;
-	
+
+
 	meshManager.shaderManager = &shaderManager; //do this before assigning any shaders to mesh
 	meshManager.textureManager = &textureManager;
 	spriteManager.shaderManager = &shaderManager;
@@ -102,11 +106,12 @@ void Engine::init()
 	spriteManager.defaultSpriteShaderID = defaultSpriteShader;
 	
 	
-	//windowSize = glm::vec2(960,540);
-	res = glm::vec2(1920, 1080);
 
-	renderImg[0] = textureManager.createRenderTexture(res.x, res.y, 0);
-	renderImg[1] = textureManager.createRenderTexture(res.x, res.y, 0);
+	res = glm::vec2(WIDTH, HEIGHT);
+	spriteManager.res = res;
+
+	renderImg[0] = textureManager.createRenderTexture(res.x, res.y, false);
+	renderImg[1] = textureManager.createRenderTexture(res.x, res.y, false);
 
 	// global illumination
 	int directShader = shaderManager.loadShader("vertex.vs", "directShader.ps");
@@ -143,37 +148,37 @@ void Engine::init()
 				  0,-1,0,0,
 				  0,0,0,1 };
 
-	reflectionImg = textureManager.createRenderTexture(res.x, res.y, 0);
+	reflectionImg = textureManager.createRenderTexture(res.x*1.f, res.y*1.f, false);
 
 	// shadows
 	shadowmapRes = 1024;
-	shadowMap[0] = textureManager.createRenderTexture(shadowmapRes, shadowmapRes, 0);
-	shadowMap[1] = textureManager.createRenderTexture(shadowmapRes, shadowmapRes, 0);
-	shadowMap[2] = textureManager.createRenderTexture(shadowmapRes, shadowmapRes, 0);
-	shadowMap[3] = textureManager.createRenderTexture(shadowmapRes, shadowmapRes, 0);
-	shadowMapComp = textureManager.createRenderTexture(shadowmapRes*4, shadowmapRes, 0);
+	shadowMap[0] = textureManager.createRenderTexture(shadowmapRes, shadowmapRes, false);
+	shadowMap[1] = textureManager.createRenderTexture(shadowmapRes, shadowmapRes, false);
+	shadowMap[2] = textureManager.createRenderTexture(shadowmapRes, shadowmapRes, false);
+	shadowMap[3] = textureManager.createRenderTexture(shadowmapRes, shadowmapRes, false);
+	shadowMapComp = textureManager.createRenderTexture(shadowmapRes*4, shadowmapRes, false);
 
 
 	glBindTexture(GL_TEXTURE_2D, shadowMapComp.colorID);
 	glGenerateMipmap(GL_TEXTURE_2D);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 16.0f);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, GLint(0));
 
 	glBindTexture(GL_TEXTURE_2D, shadowMapComp.depthID);
 	glGenerateMipmap(GL_TEXTURE_2D);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 16.0f);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, GLint(0));
 	
 
 	// GI shadows
 	GI_shadowmapRes = 256;
-	GI_shadowMap[0] = textureManager.createRenderTexture(shadowmapRes, shadowmapRes, 0);
-	GI_shadowMap[1] = textureManager.createRenderTexture(shadowmapRes, shadowmapRes, 0);
-	GI_shadowMap[2] = textureManager.createRenderTexture(shadowmapRes, shadowmapRes, 0);
-	GI_shadowMap[3] = textureManager.createRenderTexture(shadowmapRes, shadowmapRes, 0);
-	GI_shadowMapComp = textureManager.createRenderTexture(shadowmapRes * 4, shadowmapRes, 0);
+	GI_shadowMap[0] = textureManager.createRenderTexture(shadowmapRes, shadowmapRes, false);
+	GI_shadowMap[1] = textureManager.createRenderTexture(shadowmapRes, shadowmapRes, false);
+	GI_shadowMap[2] = textureManager.createRenderTexture(shadowmapRes, shadowmapRes, false);
+	GI_shadowMap[3] = textureManager.createRenderTexture(shadowmapRes, shadowmapRes, false);
+	GI_shadowMapComp = textureManager.createRenderTexture(shadowmapRes * 4, shadowmapRes, false);
 
 
 	glBindTexture(GL_TEXTURE_2D, shadowMapComp.colorID);
@@ -188,7 +193,7 @@ void Engine::init()
 	sceneScript.parseFile("scene.ss");
 	
 	int vv;
-	for (int i = 0; i < 5; i++)
+	for (uint i = 0; i < 5; i++)
 	{
 		vv = meshManager.createPlane(glm::vec2(10));
 		meshManager.setTexture(vv, lightSampleGIBuffer[i].color, 0);
@@ -198,7 +203,7 @@ void Engine::init()
 		meshManager.setShaderConst(vv, "samples", 8, 0, 0, 0);
 		meshManager.setShaderConst(vv, "resolution", res.x, res.y, 0, 0);
 		meshManager.setShaderConst(vv, "tile", 0, 0, 0, 0);
-		meshManager.setShaderConst(vv, "vcolor", 1.0, 1.0, 1.0, 1.0);
+		meshManager.setShaderConst(vv, "vcolor", 1.0f, 1.0f, 1.0f, 1.0f);
 		meshManager.setShaderConst(vv, "GI", 0, 0, 0, 0);
 		meshManager.setTexture(vv, shadowMapComp.depth, 15);
 	}
@@ -213,24 +218,25 @@ void Engine::init()
 
 	// blur
 	blurQuad = meshManager.createQuad();
-	convolutionBuffer[0] = textureManager.createRenderTexture(res.x, res.y, 0);
+	convolutionBuffer[0] = textureManager.createRenderTexture(res.x, res.y, false);
 	meshManager.setShader(blurQuad, convolutionShader);
 	
 	// bloom
 	bloomQuad = meshManager.createQuad();
-	bloomBuffer[0] = textureManager.createRenderTexture(res.x / 2, res.y / 2, 0);
-	bloomBuffer[1] = textureManager.createRenderTexture(res.x / 4, res.y / 4, 0);
+	bloomBuffer[0] = textureManager.createRenderTexture(res.x / 2, res.y / 2, false);
+	bloomBuffer[1] = textureManager.createRenderTexture(res.x / 4, res.y / 4, false);
 	meshManager.setShader(bloomQuad, bloomShader);
 	meshManager.setTexture(bloomQuad, lightSampleImg.color, 2);
+	
 
 	// FXAA
 	FXAA_Quad = meshManager.createQuad();
-	FXAA_lumaBuffer = textureManager.createRenderTexture(res.x, res.y, 0);
+	FXAA_lumaBuffer = textureManager.createRenderTexture(res.x, res.y, false);
 
 	// lightshafts
-	lightShaftBuffer[0] = textureManager.createRenderTexture(res.x, res.y, 0);
-	lightShaftBuffer[1] = textureManager.createRenderTexture(res.x, res.y, 0);
-	lightShaftBuffer[2] = textureManager.createRenderTexture(res.x/2.0, res.y/2.0, 0);
+	lightShaftBuffer[0] = textureManager.createRenderTexture(res.x, res.y, false);
+	lightShaftBuffer[1] = textureManager.createRenderTexture(res.x, res.y, false);
+	lightShaftBuffer[2] = textureManager.createRenderTexture(res.x/2, res.y/2, false);
 
 	lightShaftQuad = meshManager.createQuad();
 	meshManager.setTexture(lightShaftQuad, renderImg[0].depth, 0);
@@ -238,7 +244,7 @@ void Engine::init()
 
 	samples = 0;
 	
-	shaderManager.setMultisampleState(samples);
+	//shaderManager.setMultisampleState(samples);
 	if (samples > 0)
 	{
 		renderImgMS[0] = textureManager.createRenderTextureMultisample(res.x, res.y, samples);
@@ -278,8 +284,8 @@ void Engine::init()
 	particles = ParticleSet(10);
 	particles.shaderIndex = defaultParticleShader;
 
-	for (int n = 0; n < particles.count; n++)
-		particles.pos[n] = glm::vec3((rand()%2000)*.1-100, 0, (rand()%2000)*.1-100);
+	for (uint n = 0; n < particles.count; n++)
+		particles.pos[n] = glm::vec3((rand()%2000)*.1f-100, 0, (rand()%2000)*.1f-100);
 
 	glBindBuffer(GL_ARRAY_BUFFER, particles.posBufferID);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3)*particles.count, particles.pos, GL_STREAM_DRAW);
@@ -311,7 +317,7 @@ void Engine::init()
 	meshManager.setTexture(renderQuad, lightSampleImg.color, 2);
 	meshManager.setTexture(renderQuad, renderImg[0].depth, 10);
 	meshManager.setShader(renderQuad, defaultQuadShader);
-
+	meshManager.setTexture(renderQuad, lightShaftBuffer[1].color, 3);
 
 	
 	//GLuint quad_VertexArrayID;
@@ -350,8 +356,8 @@ void Engine::init()
 	shaderState = &Shader();
 	apertureAdjustTimer = 0;
 
-	printf("\n\n\n\n");
-	printf( boost::filesystem::initial_path().string().c_str() );
+	//printf("\n\n\n\n");
+	//printf( boost::filesystem::initial_path().string().c_str() );
 	
 	
 	control.typeInText = textManager.createText("");
@@ -365,27 +371,39 @@ void Engine::init()
 	//meshManager.createLine3(glm::vec3(0,0,10), glm::vec3(500, 200, 000), .1f);
 
 	//projectionMatrix = glm::perspective(glm::radians(control.activeCamera.FOV), 16.0f / 9.0f, 0.1f, 1000.0f);
-	mainCamera.projMatrix = glm::perspective(glm::radians(control.activeCamera.FOV), 16.0f / 9.0f, 0.1f, 1000.0f);
+	mainCamera.projMatrix = glm::perspective(glm::radians(control.activeCamera.FOV), 16.0f / 9.0f, 0.1f, 2500.0f);
 
 
 
 
 	SYSTEM_INFO sysinfo;
 	GetSystemInfo(&sysinfo);
-	processorCount = sysinfo.dwNumberOfProcessors;
+	processorCount = (char)sysinfo.dwNumberOfProcessors;
 
 	workingThread = new Thread[processorCount];
 	//setResolution(640, 480);
 
-
+	
 	return;
 }
 
 void Engine::mainLoop(void)
 {
 	editor.editorMode = control.editorMode;
-	meshManager.setShaderConst(renderQuad,"time", time, 0, 0, 0);
+	meshManager.setShaderConst(renderQuad,"time", time, 0.f, 0.f, 0.f);
 	
+	
+
+	if (control.position.y > 19.882)
+	{
+		reflectionHeight = 19.882f;
+	}
+	else
+	{
+		reflectionHeight = 0.f;
+	}
+
+
 	//printf("%f\n", duration);
 //	glm::mat4 tmat = CameraManager::lookatMatrix(mainCamera, mainCamera.pos + mainCamera.forward, 0.0f);
 //	glm::mat4 upmat = CameraManager::lookatMatrix(mainCamera, mainCamera.pos + glm::vec3(tmat[0]), 0.0f);
@@ -397,12 +415,12 @@ void Engine::mainLoop(void)
 
 	if (editor.editorMode)
 	{
-		windowSize = control.windowSize;
+		editor.windowSize = windowSize = control.windowSize;
 		double w = static_cast<double> (windowSize.x);
 		double h = static_cast<double> (windowSize.y);
 		double ar = w / h;
 
-		mainCamera.projMatrix = glm::perspective( glm::radians(control.activeCamera.FOV), 16.0f/9.0f, 0.1f, 1000.0f);
+		mainCamera.projMatrix = glm::perspective( glm::radians(control.activeCamera.FOV), 16.0f/9.0f, 0.1f, 2500.0f);
 	}
 
 	updateFrameTimeInfo();
@@ -433,6 +451,11 @@ void Engine::mainLoop(void)
 	if (state.down && state.downtimer == 0)
 		setMultisampleLevel(8);
 
+	control.updateKeystate(GLFW_KEY_5);
+	state = control.keystate[GLFW_KEY_5];
+	if (state.down && state.downtimer == 0)
+		setMultisampleLevel(16);
+
 	if (editor.editorMode)
 	{
 		control.updateKeystate(GLFW_KEY_0);
@@ -441,7 +464,8 @@ void Engine::mainLoop(void)
 		{
 			if (editor.selectCount == 1)
 			{
-				meshManager.setShaderConst(editor.selectedMesh[0], "GI", 0, 0, 0, 0);
+				
+
 				SampleVertexGI(&meshManager.meshArray[editor.selectedMesh[0]], false);
 				meshManager.setShaderConst(editor.selectedMesh[0], "GI", 1, 1, 0, 0);
 				meshManager.meshArray[editor.selectedMesh[0]].useVertexLight = true;
@@ -454,12 +478,11 @@ void Engine::mainLoop(void)
 		{
 			if (editor.selectCount == 1)
 			{
-				createLightMap(&meshManager.meshArray[editor.selectedMesh[0]], 256);
+				//createLightMap(&meshManager.meshArray[editor.selectedMesh[0]], 256);
 			}
 		}
 	}
 
-//	printf("%s %d\n", meshManager.meshArray[selectedMesh[0]].name, meshManager.meshArray[selectedMesh[0]].useVertexLight);
 
 	// toggle wireframe
 	control.updateKeystate(GLFW_KEY_F3);
@@ -544,7 +567,7 @@ void Engine::mainLoop(void)
 
 	mainCamera.viewMatrix = CameraManager::lookatMatrix(mainCamera, mainCamera.pos + mainCamera.forward, 0);
 	mainCamera.view_projMatrix = mainCamera.projMatrix * mainCamera.viewMatrix;
-	reflectCamera = CameraManager::reflectCam(mainCamera, glm::vec3(0, 1, 0), .9f);
+	reflectCamera = CameraManager::reflectCam(mainCamera, glm::vec3(0, 1, 0), reflectionHeight);
 	//reflectCamera.updateLocalVectors();
 
 	
@@ -587,9 +610,13 @@ void Engine::mainLoop(void)
 		control.resetMouseInput();
 	}
 
+	/*
+	GLboolean smooth;
 	
+	glGetBooleanv(GL_POLYGON_SMOOTH, &smooth);
+	printf("%d \n", smooth);
+	*/
 
-	
 	frustumCull(mainCamera);
 
 	render();
@@ -598,142 +625,8 @@ void Engine::mainLoop(void)
 
 void Engine::render(void)
 {
-	
-	// render first shadow cascade
-	setRenderToTexture(shadowMap[0], 0);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	// Camera matrix
-	cascadeRadius[0] = 10; //10
-	cascadeCenterDist[0] = 9.5; //9.5
-	glm::vec3 center = mainCamera.pos + mainCamera.forward*cascadeCenterDist[0];
-
-	shadowCamView[0] = lookat(center + glm::vec3(300), center, 0);
-	glm::vec3 right = glm::vec3(shadowCamView[0][0][0], shadowCamView[0][1][0], shadowCamView[0][2][0]);
-	glm::vec3 up = glm::vec3(shadowCamView[0][0][1], shadowCamView[0][1][1], shadowCamView[0][2][1]);
-	glm::vec3 direction = glm::normalize(-glm::vec3(300));
-	float shadowmapFixSize = 32;
-
-	float x = ceilf(glm::dot(center, up) * shadowmapFixSize / cascadeRadius[0]) *(cascadeRadius[0] / shadowmapFixSize);
-	float y = ceilf(glm::dot(center, right) * shadowmapFixSize / cascadeRadius[0]) *(cascadeRadius[0] / shadowmapFixSize);
-	center = up*x + right*y + direction*glm::dot(center, direction);
-	glm::vec3 origin = center - direction * 300.f;
-
-	cascadeCenter[0] = center;
-
-	shadowCamView[0] = glm::lookAtRH(origin, center, up);
-	//shadowCamView[0] = lookat(cascadeCenter[0]+glm::vec3(100), cascadeCenter[0], 0)*translate(-cascadeCenter[0] -glm::vec3(100)); ;
-	shadowOrthoProj[0] = glm::ortho(-cascadeRadius[0], cascadeRadius[0], -cascadeRadius[0], cascadeRadius[0], 1.0f, 500.0f);
-	shadowViewProj[0] = shadowOrthoProj[0] * shadowCamView[0];
-
-	for (int n = 0; n < meshManager.meshCount; n++)
-	{
-		if (!meshManager.meshArray[n].transparent && meshManager.meshArray[n].castShadow)
-			drawMeshShadowMap(&meshManager.meshArray[n], 0);
-	}
-
-	// render second shadow cascade
-	setRenderToTexture(shadowMap[1], 0);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-
-	cascadeRadius[1] = 50.f;
-	cascadeCenterDist[1] = 50;
-	center = mainCamera.pos + mainCamera.forward*cascadeCenterDist[1];
-
-	shadowCamView[1] = lookat(center + glm::vec3(300), center, 0);
-	right = glm::vec3(shadowCamView[1][0][0], shadowCamView[1][1][0], shadowCamView[1][2][0]);
-	up = glm::vec3(shadowCamView[1][0][1], shadowCamView[1][1][1], shadowCamView[1][2][1]);
-	direction = glm::normalize(-glm::vec3(300));
-
-
-	x = ceilf(glm::dot(center, up) * shadowmapFixSize / cascadeRadius[1]) *(cascadeRadius[1] / shadowmapFixSize);
-	y = ceilf(glm::dot(center, right) * shadowmapFixSize / cascadeRadius[1]) *(cascadeRadius[1] / shadowmapFixSize);
-	center = up*x + right*y + direction*glm::dot(center, direction);
-	origin = center - direction * 300.f;
-
-
-	cascadeCenter[1] = center;
-	shadowCamView[1] = glm::lookAtRH(origin, center, up);
-	shadowOrthoProj[1] = glm::ortho(-cascadeRadius[1], cascadeRadius[1], -cascadeRadius[1], cascadeRadius[1], 1.0f, 500.0f);
-	shadowViewProj[1] = shadowOrthoProj[1] * shadowCamView[1];
-
-	for (int n = 0; n < meshManager.meshCount; n++)
-	{
-		if (!meshManager.meshArray[n].transparent && meshManager.meshArray[n].castShadow)
-			drawMeshShadowMap(&meshManager.meshArray[n], 1);
-	}
-
-	// render third shadow cascade
-	setRenderToTexture(shadowMap[2], 0);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	cascadeRadius[2] = 200.0f;
-	cascadeCenterDist[2] = 190;
-	center = mainCamera.pos + mainCamera.forward*cascadeCenterDist[2];
-
-	shadowCamView[1] = lookat(center + glm::vec3(500), center, 0);
-	right = glm::vec3(shadowCamView[1][0][0], shadowCamView[1][1][0], shadowCamView[1][2][0]);
-	up = glm::vec3(shadowCamView[1][0][1], shadowCamView[1][1][1], shadowCamView[1][2][1]);
-	direction = glm::normalize(-glm::vec3(500));
-
-
-	x = ceilf(glm::dot(center, up) * shadowmapFixSize / cascadeRadius[2]) *(cascadeRadius[2] / shadowmapFixSize);
-	y = ceilf(glm::dot(center, right) * shadowmapFixSize / cascadeRadius[2]) *(cascadeRadius[2] / shadowmapFixSize);
-	center = up*x + right*y + direction*glm::dot(center, direction);
-	origin = center - direction * 300.f;
-
-	cascadeCenter[2] = center;
-	shadowCamView[2] = glm::lookAtRH(origin, center, up);
-	shadowOrthoProj[2] = glm::ortho(-cascadeRadius[2], cascadeRadius[2], -cascadeRadius[2], cascadeRadius[2], 1.0f, 800.f);
-	shadowViewProj[2] = shadowOrthoProj[2] * shadowCamView[2];
-
-	for (int n = 0; n < meshManager.meshCount; n++)
-	{
-		if (!meshManager.meshArray[n].transparent && meshManager.meshArray[n].castShadow)
-			drawMeshShadowMap(&meshManager.meshArray[n], 2);
-	}
-
-	// render fourth shadow cascade
-	setRenderToTexture(shadowMap[3], 0);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	cascadeRadius[3] = 450;
-	cascadeCenterDist[3] = 450;
-	center = mainCamera.pos + mainCamera.forward*cascadeCenterDist[3];
-
-	shadowCamView[1] = lookat(center + glm::vec3(500), center, 0);
-	right = glm::vec3(shadowCamView[1][0][0], shadowCamView[1][1][0], shadowCamView[1][2][0]);
-	up = glm::vec3(shadowCamView[1][0][1], shadowCamView[1][1][1], shadowCamView[1][2][1]);
-	direction = glm::normalize(-glm::vec3(500));
-
-	x = ceilf(glm::dot(center, up) * shadowmapFixSize / cascadeRadius[3]) *(cascadeRadius[3] / shadowmapFixSize);
-	y = ceilf(glm::dot(center, right) * shadowmapFixSize / cascadeRadius[3]) *(cascadeRadius[3] / shadowmapFixSize);
-	center = up*x + right*y + direction*glm::dot(center, direction);
-	origin = center - direction * 500.f;
-
-	cascadeCenter[3] = center;
-	shadowCamView[3] = glm::lookAtRH(origin, center, up);
-	shadowOrthoProj[3] = glm::ortho(-cascadeRadius[3], cascadeRadius[3], -cascadeRadius[3], cascadeRadius[3], 1.0f, 1000.0f);
-	shadowViewProj[3] = shadowOrthoProj[3] * shadowCamView[3];
-
-	for (int n = 0; n < meshManager.meshCount; n++)
-	{
-		if (!meshManager.meshArray[n].transparent && meshManager.meshArray[n].castShadow)
-			drawMeshShadowMap(&meshManager.meshArray[n], 3);
-	}
-
-	//compile shadow maps into single buffer
-	setRenderToTexture(shadowMapComp, 0);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	
-	drawMesh(&meshManager.meshArray[shadowCompQuad]);
-
-	glBindTexture(GL_TEXTURE_2D, shadowMapComp.depthID);
-	glGenerateMipmap(GL_TEXTURE_2D);
-	
-
+	generateShadowMap();
 
 	//render opaque geometry
 	if (samples > 0)
@@ -751,6 +644,7 @@ void Engine::render(void)
 
 	view_projMatrix = mainCamera.view_projMatrix; 
 	
+	
 	// draw opaque geometry
 	for (int n = 0; n < meshManager.meshCount; n++)
 	{
@@ -762,13 +656,13 @@ void Engine::render(void)
 				{
 					if (!meshManager.meshArray[n].transparent)
 					{
-						meshManager.setShaderConst(n, "campos", mainCamera.pos.x, mainCamera.pos.y, mainCamera.pos.z, 0);
-						meshManager.setShaderConst(n, "time", time, 0, 0, 0);
+						meshManager.setShaderConst(n, "campos", mainCamera.pos.x, mainCamera.pos.y, mainCamera.pos.z, 0.f);
+						meshManager.setShaderConst(n, "time", (float)time, 0.f, 0.f, 0.f);
 						meshManager.setShaderConst(n, "shadowMapSize", shadowmapRes, 0, 0, 0);
-						meshManager.setShaderConst(n, "cascadeCenter0", cascadeCenter[0].x, cascadeCenter[0].y, cascadeCenter[0].z, 0);
-						meshManager.setShaderConst(n, "cascadeCenter1", cascadeCenter[1].x, cascadeCenter[1].y, cascadeCenter[1].z, 0);
-						meshManager.setShaderConst(n, "cascadeCenter2", cascadeCenter[2].x, cascadeCenter[2].y, cascadeCenter[2].z, 0);
-						meshManager.setShaderConst(n, "cascadeCenter3", cascadeCenter[3].x, cascadeCenter[3].y, cascadeCenter[3].z, 0);
+						meshManager.setShaderConst(n, "cascadeCenter0", cascadeCenter[0].x, cascadeCenter[0].y, cascadeCenter[0].z, 0.f);
+						meshManager.setShaderConst(n, "cascadeCenter1", cascadeCenter[1].x, cascadeCenter[1].y, cascadeCenter[1].z, 0.f);
+						meshManager.setShaderConst(n, "cascadeCenter2", cascadeCenter[2].x, cascadeCenter[2].y, cascadeCenter[2].z, 0.f);
+						meshManager.setShaderConst(n, "cascadeCenter3", cascadeCenter[3].x, cascadeCenter[3].y, cascadeCenter[3].z, 0.f);
 						drawMesh(&meshManager.meshArray[n]);
 					}
 				}
@@ -776,8 +670,8 @@ void Engine::render(void)
 		}
 	}
 	
-	
-	glDisable(GL_SAMPLE_ALPHA_TO_ONE);
+	//if (samples > 0)
+	//	glDisable(GL_SAMPLE_ALPHA_TO_ONE);
 	
 	// render reflection image
 	
@@ -821,9 +715,9 @@ void Engine::render(void)
 
 
 
-							meshManager.setShaderConst(n, "reflectHeight", reflectionHeight, 0, 0, 0);
+							meshManager.setShaderConst(n, "reflectHeight", reflectionHeight, 0.f, 0.f, 0.f);
 							drawMesh(&meshManager.meshArray[n]);
-							meshManager.setShaderConst(n, "reflectHeight", -5000, 0, 0, 0);
+							meshManager.setShaderConst(n, "reflectHeight", -5000.f, 0.f, 0.f, 0.f);
 						}
 					}
 				}
@@ -833,17 +727,20 @@ void Engine::render(void)
 		// reflect transparent
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-		glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-		glDisable(GL_SAMPLE_ALPHA_TO_ONE);
+		if (samples > 0)
+		{
+			glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
+			glDisable(GL_SAMPLE_ALPHA_TO_ONE);
+		}
 		for (int n = 0; n < meshManager.meshCount; n++)
 		{
 			if (!meshManager.meshArray[n].isWater)
 			{
 				if (meshManager.meshArray[n].transparent && meshManager.meshArray[n].reflectable)
 				{
-					meshManager.setShaderConst(n, "reflectHeight", .9, 0, 0, 0);
+					meshManager.setShaderConst(n, "reflectHeight", reflectionHeight, 0.f, 0.f, 0.f);
 					drawMesh(&meshManager.meshArray[n]);
-					meshManager.setShaderConst(n, "reflectHeight", -5000, 0, 0, 0);
+					meshManager.setShaderConst(n, "reflectHeight", -5000.f, 0.f, 0.f, 0.f);
 				}
 			}
 		}
@@ -859,6 +756,7 @@ void Engine::render(void)
 
 	if (samples > 1.0)
 	{
+
 		resolveMultisample(renderImgMS[0], renderImg[0]);
 
 		setRenderToTexture(renderImgMS[0], renderImgMS[0].depthID);
@@ -873,20 +771,21 @@ void Engine::render(void)
 	
 	// render water
 	glDepthMask(false);
-	for (int n = 0; n < meshManager.meshCount; n++)
+	for (uint n = 0; n < meshManager.meshCount; n++)
 	{
 		if (meshManager.meshArray[n].isWater)
 		{
 			if (!meshManager.meshArray[n].frustumCulled)
 			{
-				meshManager.setShaderConst(n, "time", time, 0, 0, 0);
-				meshManager.setShaderConst(n, "campos", mainCamera.pos.x, mainCamera.pos.y, mainCamera.pos.z, 0);
+				meshManager.setShaderConst(n, "reflectHeight", reflectionHeight, 0.f, 0.f, 0.f);
+				meshManager.setShaderConst(n, "time", (float)time, 0.f, 0.f, 0.f);
+				meshManager.setShaderConst(n, "campos", mainCamera.pos.x, mainCamera.pos.y, mainCamera.pos.z, 0.f);
 				meshManager.setShaderConst(n, "resolution", res.x, res.y, 0, 0);
 				meshManager.setShaderConst(n, "shadowMapSize", shadowmapRes, 0, 0, 0);
-				meshManager.setShaderConst(n, "cascadeCenter0", cascadeCenter[0].x, cascadeCenter[0].y, cascadeCenter[0].z, 0);
-				meshManager.setShaderConst(n, "cascadeCenter1", cascadeCenter[1].x, cascadeCenter[1].y, cascadeCenter[1].z, 0);
-				meshManager.setShaderConst(n, "cascadeCenter2", cascadeCenter[2].x, cascadeCenter[2].y, cascadeCenter[2].z, 0);
-				meshManager.setShaderConst(n, "cascadeCenter3", cascadeCenter[3].x, cascadeCenter[3].y, cascadeCenter[3].z, 0);
+				meshManager.setShaderConst(n, "cascadeCenter0", cascadeCenter[0].x, cascadeCenter[0].y, cascadeCenter[0].z, 0.f);
+				meshManager.setShaderConst(n, "cascadeCenter1", cascadeCenter[1].x, cascadeCenter[1].y, cascadeCenter[1].z, 0.f);
+				meshManager.setShaderConst(n, "cascadeCenter2", cascadeCenter[2].x, cascadeCenter[2].y, cascadeCenter[2].z, 0.f);
+				meshManager.setShaderConst(n, "cascadeCenter3", cascadeCenter[3].x, cascadeCenter[3].y, cascadeCenter[3].z, 0.f);
 				drawMesh(&meshManager.meshArray[n]);
 			}
 		}
@@ -903,11 +802,11 @@ void Engine::render(void)
 		{
 			if (meshManager.meshArray[n].transparent)
 			{
-				meshManager.setShaderConst(n, "campos", mainCamera.pos.x, mainCamera.pos.y, mainCamera.pos.z, 0);
-				meshManager.setShaderConst(n, "cascadeCenter0", cascadeCenter[0].x, cascadeCenter[0].y, cascadeCenter[0].z, 0);
-				meshManager.setShaderConst(n, "cascadeCenter1", cascadeCenter[1].x, cascadeCenter[1].y, cascadeCenter[1].z, 0);
-				meshManager.setShaderConst(n, "cascadeCenter2", cascadeCenter[2].x, cascadeCenter[2].y, cascadeCenter[2].z, 0);
-				meshManager.setShaderConst(n, "cascadeCenter3", cascadeCenter[3].x, cascadeCenter[3].y, cascadeCenter[3].z, 0);
+				meshManager.setShaderConst(n, "campos", mainCamera.pos.x, mainCamera.pos.y, mainCamera.pos.z, 0.f);
+				meshManager.setShaderConst(n, "cascadeCenter0", cascadeCenter[0].x, cascadeCenter[0].y, cascadeCenter[0].z, 0.f);
+				meshManager.setShaderConst(n, "cascadeCenter1", cascadeCenter[1].x, cascadeCenter[1].y, cascadeCenter[1].z, 0.f);
+				meshManager.setShaderConst(n, "cascadeCenter3", cascadeCenter[3].x, cascadeCenter[3].y, cascadeCenter[3].z, 0.f);
+				meshManager.setShaderConst(n, "cascadeCenter2", cascadeCenter[2].x, cascadeCenter[2].y, cascadeCenter[2].z, 0.f);
 				drawMesh(&meshManager.meshArray[n]);
 			}
 		}
@@ -917,7 +816,7 @@ void Engine::render(void)
 	
 	
 	glDepthMask(true);
-	if (samples > 1.0)
+	if (samples > 1)
 	{
 		//glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
 		//glEnable(GL_SAMPLE_ALPHA_TO_ONE);
@@ -947,8 +846,10 @@ void Engine::render(void)
 	// if multisampling, resolve to to main buffer resolution
 	if (samples > 0)
 	{
+
 		resolveMultisample(renderImgMS[0], renderImg[0]);
-		setRenderToTexture(renderImg[0], 0);
+		//antialiasBuffer(renderImg[0]);
+		//setRenderToTexture(renderImg[0], 0);
 	}
 	else
 	{
@@ -960,43 +861,47 @@ void Engine::render(void)
 	
 	setRenderToTexture(lightShaftBuffer[0], 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	glm::vec2 sunpos2d = pointToScreenPos(glm::vec3(100000));
-	float looksun = glm::dot(mainCamera.forward, glm::normalize(-mainCamera.pos + glm::vec3(100000)));
-
 	
-	meshManager.setShaderConst(lightShaftQuad, "pass", 0, 0, 0, 0);
-	meshManager.setShaderConst(lightShaftQuad, "lightpos", sunpos2d.x, sunpos2d.y, looksun, 0);
-	meshManager.setShaderConst(lightShaftQuad, "resolution", res.x, res.y, 0, 0);
-
-	meshManager.setTexture(lightShaftQuad, renderImg[0].depth, 0);
-	meshManager.setTexture(lightShaftQuad, lightShaftBuffer[0].color, 1);
-
-	drawMesh(&meshManager.meshArray[lightShaftQuad]);
+	glm::vec2 sunpos2d = pointToScreenPos(-sunpos);
+	float looksun = glm::dot(mainCamera.forward, glm::normalize(-mainCamera.pos - sunpos));
 	
-	// downsample light shafts
-	setRenderToTexture(lightShaftBuffer[2], 0);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	if (looksun > 0)
+	{
+		meshManager.setShaderConst(lightShaftQuad, "pass", 0.f, 0.f, 0.f, 0.f);
+		meshManager.setShaderConst(lightShaftQuad, "lightpos", sunpos2d.x, sunpos2d.y, looksun, 0.f);
+		meshManager.setShaderConst(lightShaftQuad, "resolution", res.x, res.y, 0, 0);
 
-	meshManager.setTexture(lightShaftQuad, lightShaftBuffer[0].color, 1);
-	meshManager.setShaderConst(lightShaftQuad, "pass", 1, 0, 0, 0);
+		meshManager.setTexture(lightShaftQuad, renderImg[0].depth, 0);
+		//meshManager.setTexture(lightShaftQuad, lightShaftBuffer[0].color, 1);
+		
+		drawMesh(&meshManager.meshArray[lightShaftQuad]);
 
-	drawMesh(&meshManager.meshArray[lightShaftQuad]);
+		// downsample light shafts
+		setRenderToTexture(lightShaftBuffer[2], 0);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		meshManager.setTexture(lightShaftQuad, lightShaftBuffer[0].color, 1);
+		meshManager.setShaderConst(lightShaftQuad, "pass", 1, 0, 0, 0);
+
+		drawMesh(&meshManager.meshArray[lightShaftQuad]);
+
+		// produce light shafts
+		setRenderToTexture(lightShaftBuffer[1], 0);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		meshManager.setTexture(lightShaftQuad, lightShaftBuffer[2].color, 1);
+		meshManager.setShaderConst(lightShaftQuad, "pass", 2.f, 0.f, 0.f, 0.f);
+
+		drawMesh(&meshManager.meshArray[lightShaftQuad]);
+
+		
+
+
+		blurBuffer(lightShaftBuffer[1].color, lightShaftBuffer[1], 3, 1.0f);
+
+
+	}
 	
-	// produce light shafts
-	setRenderToTexture(lightShaftBuffer[1], 0);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	
-	meshManager.setTexture(lightShaftQuad, lightShaftBuffer[2].color, 1);
-	meshManager.setShaderConst(lightShaftQuad, "pass", 2, 0, 0, 0);
-
-	drawMesh(&meshManager.meshArray[lightShaftQuad]);
-
-	meshManager.setTexture(renderQuad, lightShaftBuffer[1].color, 3);
-
-	blurBuffer(lightShaftBuffer[1].color, lightShaftBuffer[1], 3, 1.0);
-	
-
 	
 
 	// update light sample of currentview;
@@ -1008,7 +913,7 @@ void Engine::render(void)
 	
 	// create bloom effect
 	extractHighlights(renderImg[0].color);
-	blurBuffer(bloomBuffer[1].color, bloomBuffer[1], 3, 4.0f);
+	blurBuffer(bloomBuffer[1].color, bloomBuffer[1], 10, 4.0f);
 	
 	setRenderToScreen();
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -1035,8 +940,11 @@ void Engine::render(void)
 	
 	// draw 2d items (sprite & text) in order of depth - far to near
 	glEnable(GL_BLEND);
-	glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-	glDisable(GL_SAMPLE_ALPHA_TO_ONE);
+	if (samples > 0)
+	{
+		glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
+		glDisable(GL_SAMPLE_ALPHA_TO_ONE);
+	}
 	glDepthFunc(GL_ALWAYS);
 	glDisable(GL_CULL_FACE);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -1047,15 +955,30 @@ void Engine::render(void)
 		{
 			if (spriteManager.getVisible(sorting2DArray[n].arrayIndex))
 			{
-				drawSprite(&spriteManager.spriteArray[sorting2DArray[n].arrayIndex]);
+				if (spriteManager.getType(sorting2DArray[n].arrayIndex) != spriteManager.EDITOR) drawSprite(&spriteManager.spriteArray[sorting2DArray[n].arrayIndex]);
 			}
 		}
 		if (sorting2DArray[n].type == SortItem2D::TEXT)
 		{
 			if (textManager.getVisible(sorting2DArray[n].arrayIndex))
 			{
-				drawText(sorting2DArray[n].arrayIndex);
+				if (textManager.getType(sorting2DArray[n].arrayIndex) != textManager.EDITOR) drawText(sorting2DArray[n].arrayIndex);
 			}
+		}
+	}
+
+	// draw editor entities
+	if (editor.editorMode)
+	{
+		while (editor.drawReqStack.size > 0)
+		{
+			DrawRequest a = editor.drawReqStack.pop();
+			if (a.type == editor.EDITOR_SPRITE)
+				drawSprite(&spriteManager.spriteArray[a.index]);
+			if (a.type == editor.EDITOR_TEXT)
+				drawText(a.index);
+			if (a.type == editor.EDITOR_GEOMETRY)
+				drawMesh(&meshManager.meshArray[a.index]);
 		}
 	}
 	
@@ -1065,7 +988,7 @@ void Engine::render(void)
 
 
 	// Swap buffers
-	if (VSyncState > 0)
+	if (VSyncState)
 		glFinish();
 
 	glfwSwapBuffers(window);
@@ -1078,6 +1001,7 @@ void Engine::render(void)
 void Engine::drawMesh(MeshObj *current)
 {
 
+	
 	if (current->visible)
 	{
 		
@@ -1360,9 +1284,13 @@ void Engine::drawMesh(MeshObj *current)
 					(void*)0                          // array buffer offset
 				);
 			}
-
+			
 			// Index buffer
 			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, current->elementBuffer);
+			glDisable(GL_LINE_SMOOTH);
+			
+			
+
 
 			if (drawWireFrame)
 			{
@@ -1373,17 +1301,18 @@ void Engine::drawMesh(MeshObj *current)
 			glDrawElements(
 				GL_TRIANGLES,      // mode
 				current->indices.size,    // count
-				GL_UNSIGNED_SHORT,   // type
+				GL_UNSIGNED_INT,   // type
 				(void*)0           // element array buffer offset
 			);
 
 			
-			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+			//glPolygonMode(GL_FRONT, GL_FILL);
 
 			
 			glDisableVertexAttribArray(0);
 			glDisableVertexAttribArray(1);
 			glDisableVertexAttribArray(2);
+			
 			if (current->useVertexLight)
 			{
 				glDisableVertexAttribArray(3);
@@ -1645,7 +1574,7 @@ void Engine::drawMeshGI(MeshObj *current)
 					(void*)0                          // array buffer offset
 				);
 			}
-
+			
 			if (current->useTangents)
 			{
 				// tangents
@@ -1672,7 +1601,7 @@ void Engine::drawMeshGI(MeshObj *current)
 					(void*)0                          // array buffer offset
 				);
 			}
-
+			
 			// Index buffer
 			glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, current->elementBuffer);
 
@@ -1685,7 +1614,7 @@ void Engine::drawMeshGI(MeshObj *current)
 			glDrawElements(
 				GL_TRIANGLES,      // mode
 				current->indices.size,    // count
-				GL_UNSIGNED_SHORT,   // type
+				GL_UNSIGNED_INT,   // type
 				(void*)0           // element array buffer offset
 			);
 
@@ -1894,11 +1823,14 @@ void Engine::drawMeshShadowMap(MeshObj *current, int cascade)
 
 		// Index buffer
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, current->elementBuffer);
+		//glDisable(GL_POLYGON_SMOOTH);
+		//glDisable(GL_LINE_SMOOTH);
+		
 
 		glDrawElements(
 			GL_TRIANGLES,      // mode
 			current->indices.size,    // count
-			GL_UNSIGNED_SHORT,   // type
+			GL_UNSIGNED_INT,   // type
 			(void*)0           // element array buffer offset
 			);
 
@@ -1912,7 +1844,6 @@ void Engine::drawMeshShadowMap(MeshObj *current, int cascade)
 
 void Engine::drawSprite(Sprite *current)
 {
-
 	if (shaderState->id != current->shader->id)
 	{
 		glUseProgram(current->shader->id);
@@ -2045,7 +1976,7 @@ void Engine::drawSelectedMesh(MeshObj *current)
 		glDrawElements(
 			GL_TRIANGLES,      // mode
 			current->indices.size,    // count
-			GL_UNSIGNED_SHORT,   // type
+			GL_UNSIGNED_INT,   // type
 			(void*)0           // element array buffer offset
 			);
 
@@ -2059,6 +1990,8 @@ void Engine::drawSelectedMesh(MeshObj *current)
 
 void Engine::drawText(int index)
 {
+	glCullFace(GL_BACK);
+
 	TextObj *current = &textManager.textArray[index];
 	Font *currentFont = &textManager.fontArray[textManager.textArray[index].fontID];
 	short int length = strnlen_s(current->str, 30);
@@ -2069,7 +2002,7 @@ void Engine::drawText(int index)
 
 
 	// Fill buffers
-	for (unsigned int i = 0; i<length; i++)
+	for (unsigned short i = 0; i<length; i++)
 	{
 
 		textManager.vertex_up_left = glm::vec2(xpos, ypos + current->size);
@@ -2157,13 +2090,13 @@ void Engine::drawText(int index)
 
 void Engine::blurBuffer(GLuint input, RenderTexture output, int kernel, float spread)
 {
-	glEnable(GL_BLEND);
+	//glEnable(GL_BLEND);
 	setRenderToTexture(convolutionBuffer[0], 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 
 	meshManager.setTexture(blurQuad, input, 0);
-	meshManager.setShaderConst(blurQuad, "blurScale", 4.0 / 1920.0, 0, 0, 0);
+	meshManager.setShaderConst(blurQuad, "blurScale", 4.0f / res.x, 0.f, 0.f, 0.f);
 	meshManager.setShaderConst(blurQuad, "kernel", kernel, 0, 0, 0);
 
 	drawMesh(&meshManager.meshArray[blurQuad]);
@@ -2172,21 +2105,33 @@ void Engine::blurBuffer(GLuint input, RenderTexture output, int kernel, float sp
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	meshManager.setTexture(blurQuad, convolutionBuffer[0].color, 0);
-	meshManager.setShaderConst(blurQuad, "blurScale", 0.0, 4.0 / 1080.0, 0, 0);
+	meshManager.setShaderConst(blurQuad, "blurScale", 0.0f, 4.0f / res.y, 0.f, 0.f);
 	meshManager.setShaderConst(blurQuad, "kernel", kernel, 0, 0, 0);
 
 	drawMesh(&meshManager.meshArray[blurQuad]);
-	glDisable(GL_BLEND);
+	//glDisable(GL_BLEND);
 	
 	return;
+}
 
+void Engine::colorGrading(GLuint input, RenderTexture output)
+{
+	setRenderToTexture(output, 0);
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	meshManager.setTexture(colorGradeQuad, input, 0);
+
+	drawMesh(&meshManager.meshArray[colorGradeQuad]);
 }
 
 void Engine::extractHighlights(GLuint input)
 {
+	
 	setRenderToTexture(bloomBuffer[0], 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+	meshManager.setShaderConst(bloomQuad, "pass", 0.f, 0.f, 0.f, 0.f);
+	meshManager.setShaderConst(bloomQuad, "resolution", res.x/2.0f, res.y/2.0f, 0.f, 0.f);
 	meshManager.setTexture(bloomQuad, input, 0);
 
 	drawMesh(&meshManager.meshArray[bloomQuad]);
@@ -2194,6 +2139,8 @@ void Engine::extractHighlights(GLuint input)
 	setRenderToTexture(bloomBuffer[1], 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+	meshManager.setShaderConst(bloomQuad, "pass", 1.f, 0.f, 0.f, 0.f);
+	meshManager.setShaderConst(bloomQuad, "resolution", res.x / 4.0f, res.y / 4.0f, 0.f, 0.f);
 	meshManager.setTexture(bloomQuad, bloomBuffer[0].color, 0);
 
 	drawMesh(&meshManager.meshArray[bloomQuad]);
@@ -2210,8 +2157,8 @@ void Engine::antialiasBuffer(RenderTexture input)
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	
-	glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-	glDisable(GL_SAMPLE_ALPHA_TO_ONE);
+	//glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
+	//glDisable(GL_SAMPLE_ALPHA_TO_ONE);
 
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
@@ -2219,8 +2166,8 @@ void Engine::antialiasBuffer(RenderTexture input)
 	meshManager.setTexture(FXAA_Quad, input.color, 0);
 	drawMesh(&meshManager.meshArray[FXAA_Quad]);
 
-	setRenderToTexture(input, 0);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	setRenderToTexture(input, -1);
+	glClear(GL_COLOR_BUFFER_BIT);
 	
 	meshManager.setShader(FXAA_Quad, FXAA_Shader);
 	meshManager.setTexture(FXAA_Quad, FXAA_lumaBuffer.color, 0);
@@ -2233,14 +2180,17 @@ void Engine::antialiasBuffer(RenderTexture input)
 
 void Engine::sampleLight(RenderTexture input)
 {
-
 	setRenderToTexture(lightSampleImg, 0);
-	glClear(GL_DEPTH_BUFFER_BIT);
-
+	//glClear(GL_DEPTH_BUFFER_BIT);
+	glDepthMask(false);
+	glDepthFunc(GL_ALWAYS);
 	meshManager.setTexture(lightSampleQuad, input.color, 0);
-
-	glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-	glDisable(GL_SAMPLE_ALPHA_TO_ONE);
+	
+	if (samples > 0)
+	{
+		glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
+		glDisable(GL_SAMPLE_ALPHA_TO_ONE);
+	}
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA , GL_ONE_MINUS_SRC_ALPHA);
 	drawMesh(&meshManager.meshArray[lightSampleQuad]);
@@ -2250,7 +2200,7 @@ void Engine::sampleLight(RenderTexture input)
 	glGenerateMipmap(GL_TEXTURE_2D);
 
 	glDisable(GL_BLEND);
-
+	glDepthMask(true);
 	return;
 }
 
@@ -2278,7 +2228,7 @@ glm::vec2 Engine::pointToScreenPos(glm::vec3 point)
 	pos.x /= pos.w;
 	pos.y /= pos.w;
 
-	return (glm::vec2(pos.x, pos.y) +1.f)*res / 2.f;
+	return (glm::vec2(pos.x, pos.y) + 1.0f) * glm::vec2(res) / 2.0f;
 }
 
 glm::vec3 Engine::screenPointToVector(glm::vec2 point, Camera cam)
@@ -2306,15 +2256,8 @@ glm::vec2 Engine::pointToScreenPos(glm::vec3 point, Camera cam, glm::vec2 resolu
 void Engine::frustumCull(Camera cam)
 {
 
-	bool check[8];
-	glm::ivec2 state[8];
-	glm::vec4 pos;
-	bool passx = false;
-	bool passy = false;
-	int leftcount = 0;
-	int rightcount = 0;
-	int abovecount = 0;
-	int belowcount = 0;
+	glm::vec4 p0, p1;
+	glm::vec3 maxpos, minpos;
 
 	for (int n = 0; n < meshManager.meshCount; n++)
 	{
@@ -2322,142 +2265,130 @@ void Engine::frustumCull(Camera cam)
 		{
 
 			//meshManager.meshArray[n].updateModelMatrix();
-			glm::vec4 p0 = meshManager.meshArray[n].modelMatrix * glm::vec4(meshManager.meshArray[n].maxpos, 1);
-			glm::vec4 p1 = meshManager.meshArray[n].modelMatrix * glm::vec4(meshManager.meshArray[n].minpos, 1);
+			p0 = meshManager.meshArray[n].modelMatrix * glm::vec4(meshManager.meshArray[n].maxpos, 1);
+			p1 = meshManager.meshArray[n].modelMatrix * glm::vec4(meshManager.meshArray[n].minpos, 1);
 
-			glm::vec3 maxpos = glm::vec3(p0.x, p0.y, p0.z);
-			glm::vec3 minpos = glm::vec3(p1.x, p1.y, p1.z);
-			glm::vec3 vert[8];
+			maxpos = glm::vec3(p0.x, p0.y, p0.z);
+			minpos = glm::vec3(p1.x, p1.y, p1.z);
 
-			
-			vert[0] = glm::vec3(maxpos.x, minpos.y, minpos.z);
-			vert[1] = glm::vec3(maxpos.x, minpos.y, maxpos.z);
-			vert[2] = glm::vec3(minpos.x, minpos.y, maxpos.z);
-			vert[3] = glm::vec3(minpos.x, minpos.y, minpos.z);
-			vert[4] = glm::vec3(maxpos.x, maxpos.y, minpos.z);
-			vert[5] = glm::vec3(maxpos.x, maxpos.y, maxpos.z);
-			vert[6] = glm::vec3(minpos.x, maxpos.y, maxpos.z);
-			vert[7] = glm::vec3(minpos.x, maxpos.y, minpos.z);
+			frustumCull_vert[0] = glm::vec3(maxpos.x, minpos.y, minpos.z);
+			frustumCull_vert[1] = glm::vec3(maxpos.x, minpos.y, maxpos.z);
+			frustumCull_vert[2] = glm::vec3(minpos.x, minpos.y, maxpos.z);
+			frustumCull_vert[3] = glm::vec3(minpos.x, minpos.y, minpos.z);
+			frustumCull_vert[4] = glm::vec3(maxpos.x, maxpos.y, minpos.z);
+			frustumCull_vert[5] = glm::vec3(maxpos.x, maxpos.y, maxpos.z);
+			frustumCull_vert[6] = glm::vec3(minpos.x, maxpos.y, maxpos.z);
+			frustumCull_vert[7] = glm::vec3(minpos.x, maxpos.y, minpos.z);
 
 			for (int c = 0; c < 8; c++)
 			{
-				check[c] = (glm::dot(cam.forward, glm::normalize(vert[c]-cam.pos)) > 0);
+				frustumCull_check[c] = (glm::dot(cam.forward, glm::normalize(frustumCull_vert[c]-cam.pos)) > 0);
 			}
 
 			meshManager.meshArray[n].frustumCulled = false;
-			if (!check[0] && !check[1] && !check[2] && !check[3] && !check[4] && !check[5] && !check[6] && !check[7])
+			if (!frustumCull_check[0] && !frustumCull_check[1] && !frustumCull_check[2] && !frustumCull_check[3] && !frustumCull_check[4] && !frustumCull_check[5] && !frustumCull_check[6] && !frustumCull_check[7])
 			{
 				meshManager.meshArray[n].frustumCulled = true;
 				continue;
 			}
 
-			//printf("%s ", meshManager.meshArray[n].name);
-
 			// 0 = in frustum, 1 = left of, 2 = right of
 			// 0 = in, 1 = above, 2 = below;
 			// 3 = behind
-			
 			for (int c = 0; c < 8; c++)
 			{
+				frustumCull_pos = cam.view_projMatrix * glm::vec4(frustumCull_vert[c].x, frustumCull_vert[c].y, frustumCull_vert[c].z, 1);
 
-				pos = cam.view_projMatrix * glm::vec4(vert[c].x, vert[c].y, vert[c].z, 1);
+				frustumCull_pos.x /= frustumCull_pos.w;
+				frustumCull_pos.y /= frustumCull_pos.w;
 
-				pos.x /= pos.w;
-				pos.y /= pos.w;
+				frustumCull_state[c] = glm::ivec2(0);
+				if (frustumCull_pos.x < -1) frustumCull_state[c].x = 1;
+				if (frustumCull_pos.x > 1) frustumCull_state[c].x = 2;
+				if (frustumCull_pos.y < -1) frustumCull_state[c].y = 1;
+				if (frustumCull_pos.y > 1) frustumCull_state[c].y = 2;
 
-				state[c] = glm::ivec2(0);
-				if (pos.x < -1) state[c].x = 1;
-				if (pos.x > 1) state[c].x = 2;
-				if (pos.y < -1) state[c].y = 1;
-				if (pos.y > 1) state[c].y = 2;
-
-				if (!check[c])
+				if (!frustumCull_check[c])
 				{
 					
 					{
-						if (glm::dot(glm::normalize(vert[c] - cam.pos), cam.right) >= 0)
-							state[c].x = 4;
+						if (glm::dot(glm::normalize(frustumCull_vert[c] - cam.pos), cam.right) >= 0)
+							frustumCull_state[c].x = 4;
 						else
-							state[c].x = 3;
+							frustumCull_state[c].x = 3;
 					}
 					
 					{
-						if (glm::dot(glm::normalize(vert[c] - cam.pos), cam.up) >= 0)
-							state[c].y = 4;
+						if (glm::dot(glm::normalize(frustumCull_vert[c] - cam.pos), cam.up) >= 0)
+							frustumCull_state[c].y = 4;
 						else
-							state[c].y = 3;
+							frustumCull_state[c].y = 3;
 					}
 				}
 			}
 
+			frustumCull_passx = false;
+			frustumCull_passy = false;
+			frustumCull_leftcount = 0;
+			frustumCull_rightcount = 0;
+			frustumCull_abovecount = 0;
+			frustumCull_belowcount = 0;
 
-			
-			passx = false;
-			passy = false;
-			leftcount = 0;
-			rightcount = 0;
-			abovecount = 0;
-			belowcount = 0;
-
-			for (int c = 0; c<8; c++)
+			for (int c = 0; c < 8; c++)
 			{
 				//if (state[c].x != 3)
 				{
-					if (state[c].x == 0)
+					if (frustumCull_state[c].x == 0)
 					{
-						passx = true;
+						frustumCull_passx = true;
 					}
-					if (state[c].y == 0)
+					if (frustumCull_state[c].y == 0)
 					{
-						passy = true;
+						frustumCull_passy = true;
 					}
-					if (passx && passy) break;
+					if (frustumCull_passx && frustumCull_passy) break;
 
 					// left
-					if (state[c].x == 1 || state[c].x == 3)
+					if (frustumCull_state[c].x == 1 || frustumCull_state[c].x == 3)
 					{
-						leftcount++;
+						frustumCull_leftcount++;
 					}
 
 					// right;
-					if (state[c].x == 2 || state[c].x == 4)
+					if (frustumCull_state[c].x == 2 || frustumCull_state[c].x == 4)
 					{
-						rightcount++;
+						frustumCull_rightcount++;
 					}
 
 					// above
-					if (state[c].y == 1 || state[c].y == 3)
+					if (frustumCull_state[c].y == 1 || frustumCull_state[c].y == 3)
 					{
-						abovecount++;
+						frustumCull_abovecount++;
 					}
 
 					// below;
-					if (state[c].y == 2 || state[c].y == 4)
+					if (frustumCull_state[c].y == 2 || frustumCull_state[c].y == 4)
 					{
-						belowcount++;
+						frustumCull_belowcount++;
 					}
 				}
 			}
 			
-			//printf("%S  %d, %d \n", meshManager.meshArray[n].name, leftcount, rightcount);
+			
 
-			if (!passx)
+			if (!frustumCull_passx)
 			{
-				if ((leftcount > 0 && rightcount == 0) || (leftcount == 0 && rightcount > 0))
+				if ((frustumCull_leftcount > 0 && frustumCull_rightcount == 0) || (frustumCull_leftcount == 0 && frustumCull_rightcount > 0))
 				{
 					meshManager.meshArray[n].frustumCulled = true;
-					//printf(" fail x\n");
-					//if (n == 16) Sleep(10000);
 					continue;
 				}
 			}
-			if (!passy)
+			if (!frustumCull_passy)
 			{
-				if ((abovecount > 0 && belowcount == 0) || (abovecount == 0 && belowcount > 0))
+				if ((frustumCull_abovecount > 0 && frustumCull_belowcount == 0) || (frustumCull_abovecount == 0 && frustumCull_belowcount > 0))
 				{
 					meshManager.meshArray[n].frustumCulled = true;
-					//printf(" fail y\n");
-					//if (n == 16) Sleep(10000);
 					continue;
 				}
 			}
@@ -2726,12 +2657,14 @@ void Engine::buildSceneEntity(int index)
 					}
 
 					meshManager.meshArray[meshInd].texture[n] = textureManager.texArray[a].id;
+					meshManager.meshArray[meshInd].texIndex[n] = a;
 				}
 				else
 				{
 					// if texture already exists, assign that to the mesh
 					meshManager.meshArray[meshInd].texture[n] = textureManager.texArray[exists].id;
-					meshManager.setTexture(meshInd, exists, n);
+					meshManager.meshArray[meshInd].texIndex[n] = exists;
+					//meshManager.setTexture(meshInd, exists, n);
 				}
 			}
 		}
@@ -2776,6 +2709,12 @@ void Engine::buildSceneEntity(int index)
 
 		meshManager.setShaderConst(meshInd, "samples", samples, 0, 0, 0);
 		meshManager.setShaderConst(meshInd, "resolution", res.x, res.y, 0, 0);
+		meshManager.setShaderConst(meshInd, "sundir", sundir.x, sundir.y, sundir.z, 0.f);
+		
+		if (meshManager.meshArray[meshInd].useVertexLight)
+			meshManager.setShaderConst(meshInd, "GI", 1, 0, 0, 0);
+		else
+			meshManager.setShaderConst(meshInd, "GI", 0, 0, 0, 0);
 
 		// assign shadow map
 		meshManager.setTexture(meshInd, shadowMapComp.depth, 15);
@@ -2789,7 +2728,7 @@ void Engine::buildSceneEntity(int index)
 				meshManager.setTexture(meshInd, renderImgMS[0].depth, 16);
 			}
 			
-				meshManager.setTexture(meshInd, renderImg[0].depth, 10);
+			meshManager.setTexture(meshInd, renderImg[0].depth, 10);
 		}
 
 		// assign opaque map
@@ -2850,7 +2789,6 @@ void Engine::buildSceneEntity(int index)
 		meshManager.meshArray[partInd].castShadow = sceneScript.entityArray[index].castShadow;
 	}
 }
-
 
 glm::vec3 Engine::raycastPlane(glm::vec3 p0, glm::vec3 p1, glm::vec3 norm, glm::vec3 orig)
 {
@@ -2953,7 +2891,6 @@ void Engine::swapItem2D(int dex1, int dex2)
 	sorting2DArray[dex2] = temp;
 }
 
-
 void Engine::setMultisampleLevel(char lv)
 {
 	if (lv != samples)
@@ -2976,6 +2913,7 @@ void Engine::setMultisampleLevel(char lv)
 			for (int n = 0; n < meshManager.meshCount; n++)
 			{
 				meshManager.setShaderConst(n, "samples", samples, 0, 0, 0);
+				meshManager.setShaderConst(n, "resolution", res.x, res.y, 0, 0);
 				//meshManager.meshArray[n].texture[11] = renderImg[0].color;
 				//meshManager.meshArray[n].texture[16] = renderImgMS[0].depth;
 				meshManager.setTexture(n, renderImg[0].color, 11);
@@ -3000,6 +2938,7 @@ void Engine::setMultisampleLevel(char lv)
 			{
 
 				meshManager.setShaderConst(n, "samples", samples, 0, 0, 0);
+				meshManager.setShaderConst(n, "resolution", res.x, res.y, 0, 0);
 				//meshManager.meshArray[n].texture[11] =  renderImg[1].color ;
 				//0meshManager.meshArray[n].texture[10] =  renderImg[0].depth;
 				meshManager.setTexture(n, renderImg[1].color, 11);
@@ -3019,6 +2958,7 @@ void Engine::setMultisampleLevel(char lv)
 			for (int n = 0; n < meshManager.meshCount; n++)
 			{
 				meshManager.setShaderConst(n, "samples", samples, 0, 0, 0);
+				meshManager.setShaderConst(n, "resolution", res.x, res.y, 0, 0);
 				//meshManager.meshArray[n].texture[11] = renderImg[0].color;
 				//meshManager.meshArray[n].texture[16] = renderImgMS[0].depth;
 				meshManager.setTexture(n, renderImg[0].color, 11);
@@ -3028,7 +2968,7 @@ void Engine::setMultisampleLevel(char lv)
 		}
 
 		
-		shaderManager.setMultisampleState(samples);
+		//shaderManager.setMultisampleState(samples);
 	}
 }
 
@@ -3083,6 +3023,7 @@ void Engine::setResolution(int width, int height)
 		FXAA_lumaBuffer = textureManager.createRenderTexture(res.x, res.y, 0);
 
 		// lightshafts
+		
 		glDeleteTextures(1, &lightShaftBuffer[0].colorID);
 		glDeleteTextures(1, &lightShaftBuffer[0].depthID);
 		glDeleteFramebuffers(1, &lightShaftBuffer[0].fbo);
@@ -3096,7 +3037,8 @@ void Engine::setResolution(int width, int height)
 		glDeleteFramebuffers(1, &lightShaftBuffer[2].fbo);
 		lightShaftBuffer[0] = textureManager.createRenderTexture(res.x, res.y, 0);
 		lightShaftBuffer[1] = textureManager.createRenderTexture(res.x, res.y, 0);
-		lightShaftBuffer[2] = textureManager.createRenderTexture(res.x / 2.0, res.y / 2.0, 0);
+		lightShaftBuffer[2] = textureManager.createRenderTexture(res.x / 2, res.y / 2, 0);
+		
 	}
 
 	// no multisampling
@@ -3153,13 +3095,13 @@ void Engine::setResolution(int width, int height)
 		glDeleteFramebuffers(1, &lightShaftBuffer[2].fbo);
 		lightShaftBuffer[0] = textureManager.createRenderTexture(res.x, res.y, 0);
 		lightShaftBuffer[1] = textureManager.createRenderTexture(res.x, res.y, 0);
-		lightShaftBuffer[2] = textureManager.createRenderTexture(res.x / 2.0, res.y / 2.0, 0);
+		lightShaftBuffer[2] = textureManager.createRenderTexture(res.x / 2, res.y / 2, 0);
 	}
 
 
 	meshManager.setTexture(renderQuad, renderImg[0].color, 0);
 	meshManager.setShaderConst(FXAA_Quad, "resolution", res.x, res.y, 0, 0);
-	for (int n = 0 ; n<17; n++)
+	for (unsigned char n = 0 ; n<17; n++)
 		textureStateID[n] = -1;
 	
 }
@@ -3182,7 +3124,7 @@ void Engine::SampleVertexGI(MeshObj *mesh, bool doublesided)
 	float val1[3] = { 0.0f };
 
 	float zNear = .1f;
-	float zFar = 1000.0f;
+	float zFar = 2500.0;
 	float z_b = 1.0;
 	float z_n = 2.0 * z_b - 1.0;
 	float realdep0 = 2.0 * zNear * zFar / (zFar + zNear - z_n * (zFar - zNear));
@@ -3194,17 +3136,24 @@ void Engine::SampleVertexGI(MeshObj *mesh, bool doublesided)
 	float mindepth = 0.f;
 	glm::mat3 frame;
 
-	int a;
+	int a = 1.0;
 	bool flip;
 	bool isFoliage;
 
-	std::cout << "gradient divisor";
-	std::cin >> a;
+	int GI_pass;
+	std::cout << "GI pass";
+	std::cin >> GI_pass;
+
 	std::cout << "foliage?";
 	std::cin >> isFoliage;
+	if (!isFoliage)
+	{
+		std::cout << "gradient divisor";
+		std::cin >> a;
+	}
 	for (int recordsSet = 0; recordsSet < 2; recordsSet++)
 	{
-		for (int pp = 0; pp < mesh->indices.size; pp++)
+		for (uint pp = 0; pp < mesh->indices.size; pp++)
 		{
 
 			int index = mesh->indices.item[pp];
@@ -3232,7 +3181,7 @@ void Engine::SampleVertexGI(MeshObj *mesh, bool doublesided)
 			glm::vec4 transvert = mesh->transformMatrix*glm::vec4(mesh->ind_vertex.item[index],1);
 			glm::vec3 pos = glm::vec3(transvert) + mesh->pos;
 			glm::vec3 norm = glm::mat3(mesh->transformMatrix) * mesh->ind_normal.item[index];
-
+			//if (isFoliage) norm = glm::vec3(0, 1, 0);
 
 			glm::vec3 offsetsamplepoint;
 			if (glm::length(mesh->ind_vertex.item[index] - tricenter) > .15)
@@ -3270,8 +3219,8 @@ void Engine::SampleVertexGI(MeshObj *mesh, bool doublesided)
 			frame = CameraManager::lookatMatrix(GICamera, pos + norm, glm::radians(0.f));
 
 			int sides = 1;
-			if (doublesided || isFoliage) sides = 2;
-
+			//if (doublesided || isFoliage) sides = 2;
+			
 			//two sided render twice
 			for (int pass = 0; pass < sides; pass++)
 			{
@@ -3281,11 +3230,11 @@ void Engine::SampleVertexGI(MeshObj *mesh, bool doublesided)
 					//GICamera.forward = norm;
 				}
 				sampleRotation = 0;// rand() % 180;
-				samplepoint(pos, norm, sampleRotation, isFoliage);
+				samplepoint(pos, norm, sampleRotation, isFoliage, GI_pass);
 
 				for (int cubeFace = 0; cubeFace < 5; cubeFace++)
 				{
-					glActiveTexture(GL_TEXTURE16);
+					//glActiveTexture(GL_TEXTURE16);
 					glBindTexture(GL_TEXTURE_2D, lightSampleGIBuffer[cubeFace].colorID);
 
 					glGetTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_FLOAT, &colorSample[cubeFace]);
@@ -3313,7 +3262,7 @@ void Engine::SampleVertexGI(MeshObj *mesh, bool doublesided)
 				float gradWeight = 0.0f;
 				mindepth = 1.0;
 				
-				particles.pos[samplesTaken] = pos;
+				//particles.pos[samplesTaken] = pos;
 				
 				for (int cubeFace = 0; cubeFace <5; cubeFace++)
 				{
@@ -3343,6 +3292,8 @@ void Engine::SampleVertexGI(MeshObj *mesh, bool doublesided)
 							
 							float angle = glm::dot(glm::vec3(0, 0, 1), texelDir);
 							if (angle < 0.05) continue;
+
+							
 							if (pass == 0)
 							{
 								val0[0] += r * angle;
@@ -3355,6 +3306,7 @@ void Engine::SampleVertexGI(MeshObj *mesh, bool doublesided)
 								val1[1] += g * angle;
 								val1[2] += b * angle;
 							}
+
 							areacount += angle;
 
 							if (!isFoliage)
@@ -3372,7 +3324,7 @@ void Engine::SampleVertexGI(MeshObj *mesh, bool doublesided)
 								rot_grad_sum[1] += g * gradDir;
 								rot_grad_sum[2] += b * gradDir;
 
-								gradWeight += 1.0 / texelDir.z;
+								gradWeight += 1.0f / texelDir.z;
 
 								if (depthSample[cubeFace][(j + 32 * k)] > .01)
 									if (mindepth > depthSample[cubeFace][(j + 32 * k)]) mindepth = depthSample[cubeFace][(j + 32 * k)];
@@ -3383,7 +3335,7 @@ void Engine::SampleVertexGI(MeshObj *mesh, bool doublesided)
 					
 					if (isFoliage) break;
 				}
-
+				
 				
 				if (!isFoliage)
 				{
@@ -3402,6 +3354,7 @@ void Engine::SampleVertexGI(MeshObj *mesh, bool doublesided)
 					val0[0] /= areacount;
 					val0[1] /= areacount;
 					val0[2] /= areacount;
+
 				}
 				if (pass == 1)
 				{
@@ -3411,10 +3364,9 @@ void Engine::SampleVertexGI(MeshObj *mesh, bool doublesided)
 				}
 
 			}
-
-
+			
 			if (doublesided || isFoliage)
-				mesh->ind_GI.item[index] = .5f*(glm::vec3(val0[0], val0[1], val0[2]) + glm::vec3(val1[0], val1[1], val1[2]));
+				mesh->ind_GI.item[index] = (glm::vec3(val0[0], val0[1], val0[2]) + glm::vec3(val1[0], val1[1], val1[2]));
 			else
 				mesh->ind_GI.item[index] = glm::vec3(val0[0], val0[1], val0[2]);
 
@@ -3423,20 +3375,20 @@ void Engine::SampleVertexGI(MeshObj *mesh, bool doublesided)
 			if (!isFoliage)
 			{
 				float z_b = mindepth;
-				float z_n = 2.0 * z_b - 1.0;
-				realdep0 = 2.0 * zNear * zFar / (zFar + zNear - z_n * (zFar - zNear));
+				float z_n = 2.0f * z_b - 1.0f;
+				realdep0 = 2.0f * zNear * zFar / (zFar + zNear - z_n * (zFar - zNear));
 			}
 
 			if (!isFoliage) 
 				GItree.add(IrradianceSample(mesh->ind_GI.item[index], glm::min(4.f*realdep0+.5f, 30.0f), pos, norm, rotGrad));
 			else
-				GItree.add(IrradianceSample(mesh->ind_GI.item[index], 3.f, pos, norm, rotGrad));
+				GItree.add(IrradianceSample(mesh->ind_GI.item[index], .5f, pos, norm, rotGrad));
 
 			samplesTaken++;
 		}
 
-		glBindBuffer(GL_ARRAY_BUFFER, particles.posBufferID);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3)*particles.count, particles.pos, GL_STREAM_DRAW);
+		//glBindBuffer(GL_ARRAY_BUFFER, particles.posBufferID);
+		//glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3)*particles.count, particles.pos, GL_STREAM_DRAW);
 	}
 	mesh->ind_GI.size = mesh->ind_vertex.size;
 
@@ -3453,7 +3405,6 @@ void Engine::SampleVertexGI(MeshObj *mesh, bool doublesided)
 	glBufferData(GL_ARRAY_BUFFER, mesh->ind_GI.size * sizeof(glm::vec3), &mesh->ind_GI.item[0], GL_STATIC_DRAW);
 
 }
-
 
 // Solid angle of an axis aligned quad from (0,0,1) to (x,y,1)
 // See: http://www.fizzmoll11.com/thesis/ for a derivation of this formula.
@@ -3487,361 +3438,6 @@ float Engine::solid_angle_term(const glm::vec2 & f, int cube_size)
 float Engine::clamped_cosine_term(const glm::vec3 & dir) 
 {
 	return glm::clamp(dir.z, 0.0f, 1.0f);
-}
-
-int Engine::createLightMap(MeshObj *mesh, float size)
-{
-
-	//calculate min and max triangle uv
-	glm::vec2 *minuv = new glm::vec2[mesh->indices.size / 3];
-	glm::vec2 *maxuv = new glm::vec2[mesh->indices.size / 3];;
-	glm::vec2 uv0, uv1, uv2;
-	for (int n = 0; n < mesh->indices.size/3; n++)
-	{
-		uv0 = mesh->ind_uv.item[mesh->indices.item[3*n]];
-		uv1 = mesh->ind_uv.item[mesh->indices.item[3*n+1]];
-		uv2 = mesh->ind_uv.item[mesh->indices.item[3*n+2]];
-
-		minuv[n].x = uv0.x;
-		minuv[n].y = uv0.y;
-		maxuv[n].x = uv0.x;
-		maxuv[n].y = uv0.y;
-
-		if (uv1.x > maxuv[n].x) maxuv[n].x = uv1.x;
-		if (uv1.y > maxuv[n].y) maxuv[n].y = uv1.y;
-		if (uv2.x > maxuv[n].x) maxuv[n].x = uv2.x;
-		if (uv2.y > maxuv[n].y) maxuv[n].y = uv2.y;
-
-		if (uv1.x < minuv[n].x) minuv[n].x = uv1.x;
-		if (uv1.y < minuv[n].y) minuv[n].y = uv1.y;
-		if (uv2.x < minuv[n].x) minuv[n].x = uv2.x;
-		if (uv2.y < minuv[n].y) minuv[n].y = uv2.y;
-		
-		minuv[n] *= size;
-		maxuv[n] *= size;
-
-	}
-
-
-	float *sampleBuffer = new float[4*size*size];
-	int index0, index1, index2;
-	glm::vec3 vertpos[3];
-	glm::vec3 vertnorm[3];
-	glm::vec2 vertuv[3];
-	glm::vec3 blendVal, blendUV, blendPos, blendNorm;
-	glm::vec2 point;
-	
-	bool inTri;
-	int u, v;
-	int lastTri = -1;
-	glm::vec3 lastpos = glm::vec3(1000, 0, 0);
-	char stepcounter = 0;
-
-
-	for (int uv = 0; uv < size*size; uv++)
-	{
-
-		u = (uv)%int(size);
-		v = uv / size;
-		if (v % 4 != 0) continue;
-
-		point = glm::vec2(u, v);
-
-		for (int n = 0; n < mesh->indices.size; n += 3)
-		{
-			if (u + 2 >= minuv[int(n / 3)].x && u - 2 <= maxuv[int(n / 3)].x)
-				if (v + 2 >= minuv[int(n / 3)].y && v - 2 <= maxuv[int(n / 3)].y)
-				{
-					if (abs(minuv[int(n / 3)].x - maxuv[int(n / 3)].x) < 2 ||
-						abs(minuv[int(n / 3)].y - maxuv[int(n / 3)].y) < 2)
-					{
-						index0 = mesh->indices.item[n];
-						index1 = mesh->indices.item[n + 1];
-						index2 = mesh->indices.item[n + 2];
-
-						vertuv[0] = size*mesh->ind_uv.item[index0];
-						vertuv[1] = size*mesh->ind_uv.item[index1];
-						vertuv[2] = size*mesh->ind_uv.item[index2];
-
-						vertpos[0] = mesh->ind_vertex.item[index0];
-						vertpos[1] = mesh->ind_vertex.item[index1];
-						vertpos[2] = mesh->ind_vertex.item[index2];
-
-						vertnorm[0] = mesh->ind_normal.item[index0];
-						vertnorm[1] = mesh->ind_normal.item[index1];
-						vertnorm[2] = mesh->ind_normal.item[index2];
-
-						blendPos = (vertpos[0] + vertpos[1] + vertpos[2]) / 3.0f;
-						blendNorm = (vertnorm[0] + vertnorm[1] + vertnorm[2]) / 3.0f;
-						
-						samplepoint(blendPos, blendNorm, 0.0, false);
-
-						/*sampleBuffer[4 * uv] = sp.lightVal.x;
-						sampleBuffer[4 * uv + 1] = sp.lightVal.y;
-						sampleBuffer[4 * uv + 2] = sp.lightVal.z;
-						sampleBuffer[4 * uv + 3] = 1.0;*/
-					}
-					else
-					{
-
-						index0 = mesh->indices.item[n];
-						index1 = mesh->indices.item[n + 1];
-						index2 = mesh->indices.item[n + 2];
-
-						vertuv[0] = size*mesh->ind_uv.item[index0];
-						vertuv[1] = size*mesh->ind_uv.item[index1];
-						vertuv[2] = size*mesh->ind_uv.item[index2];
-
-						inTri = pointInTriangleUV(vertuv[0], vertuv[1], vertuv[2], point);
-
-						if (inTri)
-						{
-							vertpos[0] = mesh->ind_vertex.item[index0];
-							vertpos[1] = mesh->ind_vertex.item[index1];
-							vertpos[2] = mesh->ind_vertex.item[index2];
-
-							vertnorm[0] = mesh->ind_normal.item[index0];
-							vertnorm[1] = mesh->ind_normal.item[index1];
-							vertnorm[2] = mesh->ind_normal.item[index2];
-
-							for (int i = 0; i < 3; i++)
-							{
-								vertpos[i] += mesh->pos;
-							}
-
-							blendVal = interpolateTriangleUV(vertuv[0], vertuv[1], vertuv[2], point);
-
-							blendPos = blendVal.x * vertpos[0] + blendVal.y * vertpos[1] + blendVal.z*vertpos[2];
-							blendNorm = blendVal.x * vertnorm[0] + blendVal.y * vertnorm[1] + blendVal.z*vertnorm[2];
-
-							if (lastTri == n)
-							{
-								//if (length(blendPos - lastpos) > .5) lastTri = -1;
-
-								stepcounter++;
-								if (stepcounter >= 4)
-								{
-									lastTri = -1;
-									stepcounter = 0;
-								}
-							}
-							if (lastTri != n)
-							{
-								lastTri = n;
-								lastpos = blendPos;
-
-								samplepoint(blendPos, blendNorm, 0.0, false);
-								/*
-								sampleBuffer[4 * uv] = sp.lightVal.x;
-								sampleBuffer[4 * uv + 1] = sp.lightVal.y;
-								sampleBuffer[4 * uv + 2] = sp.lightVal.z;
-								sampleBuffer[4 * uv + 3] = 1.0;*/
-							}
-
-							/*
-							sampleBuffer[4 * uv] = blendVal.x;
-							sampleBuffer[4 * uv + 1] = blendVal.y;
-							sampleBuffer[4 * uv + 2] = blendVal.z;
-							sampleBuffer[4 * uv + 3] = 1.0;
-
-
-
-							float len = glm::length(point - (vertuv[0] + vertuv[1] + vertuv[2]) / 3.0f);
-							if (len < 1.f)
-							{
-								sampleBuffer[4 * uv] = 1;
-								sampleBuffer[4 * uv + 1] = 1;
-								sampleBuffer[4 * uv + 2] = 1;
-							}
-							*/
-						}
-					}
-				}
-		}
-	}
-
-	printf("\n done \n");
-
-	glm::vec4 neighbor[16];
-	int pos;
-	int found;
-	int sampleRadius =4;
-	
-	for (int uv = 0; uv < size*size; uv++)
-	{
-		if (sampleBuffer[4 * uv + 3] < .1)
-		{
-			
-			found = 0;
-			for (u = -sampleRadius; u <= sampleRadius; u++)
-			{
-				if (found == 16) goto start;
-				for (v = -sampleRadius; v <= sampleRadius; v++)
-				{
-					if (found == 16) goto start;
-
-					pos = uv + u + v*size;
-					//if ((uv + u) / int(size) != uv / int(size)) goto start;
-					if (pos<0 || pos>size*size) pos = 0;
-
-					//printf("%d , %d, %d, %d \n", pos, u, v, uv);
-					if (sampleBuffer[4 * pos + 3] > .9)
-					{
-						if (glm::length(glm::vec2(u, v)) < sampleRadius)
-						{
-							neighbor[found].x = sampleBuffer[4 * pos];
-							neighbor[found].y = sampleBuffer[4 * pos + 1];
-							neighbor[found].z = sampleBuffer[4 * pos + 2];
-							neighbor[found].w = glm::length(glm::vec2(u, v));
-							found++;
-						}
-					}
-				}
-			}
-		start:
-			{
-				// get nearest sample
-				float dist = neighbor[0].w;
-				int closest = 0;
-				int closest1 = 0;
-				for (int n = 1; n < found; n++)
-				{
-					if (dist > neighbor[n].w)
-					{
-						dist = neighbor[n].w;
-						closest = n;
-					}
-				}
-				//get second nearest sample
-				if (found > 1)
-				{
-					dist = neighbor[0].w;
-					
-					for (int n = 1; n < found; n++)
-					{
-						if (n != closest)
-						{
-							if (dist > neighbor[n].w)
-							{
-								dist = neighbor[n].w;
-								closest1 = n;
-							}
-						}
-					}
-				}
-				else
-				{
-					closest1 = closest;
-				}
-
-
-				sampleBuffer[4 * uv+3] = 0.8;
-				
-				sampleBuffer[4 * uv] = .5*(neighbor[closest].x + neighbor[closest1].x);
-				sampleBuffer[4 * uv+1] = .5*(neighbor[closest].y + neighbor[closest1].y);
-				sampleBuffer[4 * uv+2] = .5*(neighbor[closest].z + neighbor[closest1].z);
-				/*
-				sampleBuffer[4 * uv] = (neighbor[closest].x );
-				sampleBuffer[4 * uv + 1] = (neighbor[closest].y);
-				sampleBuffer[4 * uv + 2] = (neighbor[closest].z );
-				
-				if (found == 0)
-				{
-					sampleBuffer[4 * uv] = (1.0);
-					sampleBuffer[4 * uv + 1] = (0.0);
-					sampleBuffer[4 * uv + 2] = (0.0);
-					sampleBuffer[4 * uv + 3] = 1.f;
-				}*/
-			}
-		}
-	
-	}
-	
-	for (int pass = 0; pass<3; pass++)
-	{
-		for (int uv = 0; uv < size*size; uv++)
-		{
-			if (uv > size)
-			{
-				if (sampleBuffer[4 * (uv - int(size)) + 3] > .7)
-				{
-					sampleBuffer[4 * uv] *= .88888;
-					sampleBuffer[4 * uv + 1] *= .88888;
-					sampleBuffer[4 * uv + 2] *= .88888;
-
-					//up
-					sampleBuffer[4 * uv] += .55555*sampleBuffer[4 * (uv - int(size))];
-					sampleBuffer[4 * uv + 1] += .55555*sampleBuffer[4 * (uv - int(size)) + 1];
-					sampleBuffer[4 * uv + 2] += .55555*sampleBuffer[4 * (uv - int(size)) + 2];
-
-					//left
-					sampleBuffer[4 * uv] += .55555*sampleBuffer[4 * (uv - 1)];
-					sampleBuffer[4 * uv + 1] += .55555*sampleBuffer[4 * (uv - 1) + 1];
-					sampleBuffer[4 * uv + 2] += .55555*sampleBuffer[4 * (uv - 1) + 2];
-
-					//upleft
-					sampleBuffer[4 * uv] += .22222*sampleBuffer[4 * (uv - int(size) - 1)];
-					sampleBuffer[4 * uv + 1] += .22222*sampleBuffer[4 * (uv - int(size) - 1) + 1];
-					sampleBuffer[4 * uv + 2] += .22222*sampleBuffer[4 * (uv - int(size) - 1) + 2];
-
-					//right
-					sampleBuffer[4 * uv] += .55555*sampleBuffer[4 * (uv + 1)];
-					sampleBuffer[4 * uv + 1] += .55555*sampleBuffer[4 * (uv + 1) + 1];
-					sampleBuffer[4 * uv + 2] += .55555*sampleBuffer[4 * (uv + 1) + 2];
-
-					//upright
-					sampleBuffer[4 * uv] += .22222*sampleBuffer[4 * (uv - int(size) + 1)];
-					sampleBuffer[4 * uv + 1] += .22222*sampleBuffer[4 * (uv - int(size) + 1) + 1];
-					sampleBuffer[4 * uv + 2] += .22222*sampleBuffer[4 * (uv - int(size) + 1) + 2];
-
-					if (uv + size < size*size)
-					{
-						//down
-						sampleBuffer[4 * uv] += .55555*sampleBuffer[4 * (uv + int(size))];
-						sampleBuffer[4 * uv + 1] += .55555*sampleBuffer[4 * (uv + int(size)) + 1];
-						sampleBuffer[4 * uv + 2] += .55555*sampleBuffer[4 * (uv + int(size)) + 2];
-
-						//downleft
-						sampleBuffer[4 * uv] += .22222*sampleBuffer[4 * (uv + int(size) - 1)];
-						sampleBuffer[4 * uv + 1] += .22222*sampleBuffer[4 * (uv + int(size) - 1) + 1];
-						sampleBuffer[4 * uv + 2] += .22222*sampleBuffer[4 * (uv + int(size) - 1) + 2];
-
-						//downright
-						sampleBuffer[4 * uv] += .22222*sampleBuffer[4 * (uv + int(size) + 1)];
-						sampleBuffer[4 * uv + 1] += .22222*sampleBuffer[4 * (uv + int(size) + 1) + 1];
-						sampleBuffer[4 * uv + 2] += .22222*sampleBuffer[4 * (uv + int(size) + 1) + 2];
-					}
-
-					sampleBuffer[4 * uv] /= 4.0f;
-					sampleBuffer[4 * uv + 1] /= 4.0f;
-					sampleBuffer[4 * uv + 2] /= 4.0f;
-				}
-			}
-			if (sampleBuffer[4 * uv + 3] > .5) sampleBuffer[4 * uv + 3] = 1.0;
-		}
-	}
-	
-	GLuint textureID;
-	glGenTextures(1, &textureID);
-
-	// "Bind" the newly created texture : all future texture functions will modify this texture
-	glBindTexture(GL_TEXTURE_2D, textureID);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, size, size, 0, GL_RGBA, GL_FLOAT, sampleBuffer);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	glGenerateMipmap(GL_TEXTURE_2D);
-
-	TextureObj temp;
-	temp.size = glm::vec2(size);
-	strcpy(temp.name, "sample buffer");
-	temp.id = textureID;
-
-	Shader *shader = &shaderManager.shaderArray[mesh->shaderIndex];
-	mesh->setShaderConst(shader, "GI", 1, 1, 0, 0);
-
-	return textureManager.add(temp);
 }
 
 bool Engine::pointInTriangleUV(glm::vec2 uv0, glm::vec2 uv1, glm::vec2 uv2, glm::vec2 point)
@@ -3915,120 +3511,20 @@ bool Engine::moe(float input, float check, float margin)
 	return false;
 }
 
-void Engine::samplepoint(glm::vec3 pos, glm::vec3 norm, float rotation, bool foliage)
+void Engine::samplepoint(glm::vec3 pos, glm::vec3 norm, float rotation, bool foliage, char GI_pass)
 {
-
 	GICamera.pos = pos;
 	GICamera.forward = norm;// glm::vec3(0, 1, 0);
 
-
-	// render first shadow cascade
-	setRenderToTexture(GI_shadowMap[0], 0);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	// Camera matrix
-	cascadeRadius[0] = 10; //10
-	cascadeCenterDist[0] = 9.5; //9.5
-	glm::vec3 center = GICamera.pos + GICamera.forward*cascadeCenterDist[0];
-
-	shadowCamView[0] = lookat(center + glm::vec3(300), center, 0);
-	glm::vec3 right = glm::vec3(shadowCamView[0][0][0], shadowCamView[0][1][0], shadowCamView[0][2][0]);
-	glm::vec3 up = glm::vec3(shadowCamView[0][0][1], shadowCamView[0][1][1], shadowCamView[0][2][1]);
-	glm::vec3 direction = glm::normalize(-glm::vec3(300));
-	float shadowmapFixSize = 32;
-
-	float x = ceilf(glm::dot(center, up) * shadowmapFixSize / cascadeRadius[0]) *(cascadeRadius[0] / shadowmapFixSize);
-	float y = ceilf(glm::dot(center, right) * shadowmapFixSize / cascadeRadius[0]) *(cascadeRadius[0] / shadowmapFixSize);
-	center = up * x + right * y + direction * glm::dot(center, direction);
-	glm::vec3 origin = center - direction * 300.f;
-
-	cascadeCenter[0] = center;
-
-	shadowCamView[0] = glm::lookAtRH(origin, center, up);
-	//shadowCamView[0] = lookat(cascadeCenter[0]+glm::vec3(100), cascadeCenter[0], 0)*translate(-cascadeCenter[0] -glm::vec3(100)); ;
-	shadowOrthoProj[0] = glm::ortho(-cascadeRadius[0], cascadeRadius[0], -cascadeRadius[0], cascadeRadius[0], 1.0f, 500.0f);
-	shadowViewProj[0] = shadowOrthoProj[0] * shadowCamView[0];
-
-	for (int n = 0; n < meshManager.meshCount; n++)
-	{
-		if (!meshManager.meshArray[n].transparent && meshManager.meshArray[n].castShadow)
-			drawMeshShadowMap(&meshManager.meshArray[n], 0);
-	}
-
-	// render second shadow cascade
-	setRenderToTexture(GI_shadowMap[1], 0);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-
-	cascadeRadius[1] = 50.f;
-	cascadeCenterDist[1] = 50;
-	center = GICamera.pos + GICamera.forward*cascadeCenterDist[1];
-
-	shadowCamView[1] = lookat(center + glm::vec3(300), center, 0);
-	right = glm::vec3(shadowCamView[1][0][0], shadowCamView[1][1][0], shadowCamView[1][2][0]);
-	up = glm::vec3(shadowCamView[1][0][1], shadowCamView[1][1][1], shadowCamView[1][2][1]);
-	direction = glm::normalize(-glm::vec3(300));
-
-
-	x = ceilf(glm::dot(center, up) * shadowmapFixSize / cascadeRadius[1]) *(cascadeRadius[1] / shadowmapFixSize);
-	y = ceilf(glm::dot(center, right) * shadowmapFixSize / cascadeRadius[1]) *(cascadeRadius[1] / shadowmapFixSize);
-	center = up * x + right * y + direction * glm::dot(center, direction);
-	origin = center - direction * 300.f;
-
-
-	cascadeCenter[1] = center;
-	shadowCamView[1] = glm::lookAtRH(origin, center, up);
-	shadowOrthoProj[1] = glm::ortho(-cascadeRadius[1], cascadeRadius[1], -cascadeRadius[1], cascadeRadius[1], 1.0f, 500.0f);
-	shadowViewProj[1] = shadowOrthoProj[1] * shadowCamView[1];
-
-	for (int n = 0; n < meshManager.meshCount; n++)
-	{
-		if (!meshManager.meshArray[n].transparent && meshManager.meshArray[n].castShadow)
-			drawMeshShadowMap(&meshManager.meshArray[n], 1);
-	}
-
-	// render third shadow cascade
-	setRenderToTexture(GI_shadowMap[2], 0);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	cascadeRadius[2] = 200.0f;
-	cascadeCenterDist[2] = 190;
-	center = GICamera.pos + GICamera.forward*cascadeCenterDist[2];
-
-	shadowCamView[1] = lookat(center + glm::vec3(500), center, 0);
-	right = glm::vec3(shadowCamView[1][0][0], shadowCamView[1][1][0], shadowCamView[1][2][0]);
-	up = glm::vec3(shadowCamView[1][0][1], shadowCamView[1][1][1], shadowCamView[1][2][1]);
-	direction = glm::normalize(-glm::vec3(500));
-
-
-	x = ceilf(glm::dot(center, up) * shadowmapFixSize / cascadeRadius[2]) *(cascadeRadius[2] / shadowmapFixSize);
-	y = ceilf(glm::dot(center, right) * shadowmapFixSize / cascadeRadius[2]) *(cascadeRadius[2] / shadowmapFixSize);
-	center = up * x + right * y + direction * glm::dot(center, direction);
-	origin = center - direction * 300.f;
-
-	cascadeCenter[2] = center;
-	shadowCamView[2] = glm::lookAtRH(origin, center, up);
-	shadowOrthoProj[2] = glm::ortho(-cascadeRadius[2], cascadeRadius[2], -cascadeRadius[2], cascadeRadius[2], 1.0f, 800.f);
-	shadowViewProj[2] = shadowOrthoProj[2] * shadowCamView[2];
-
-	for (int n = 0; n < meshManager.meshCount; n++)
-	{
-		if (!meshManager.meshArray[n].transparent && meshManager.meshArray[n].castShadow)
-			drawMeshShadowMap(&meshManager.meshArray[n], 2);
-	}
-	
-	//compile shadow maps into single buffer
-	setRenderToTexture(GI_shadowMapComp, 0);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-
-	drawMesh(&meshManager.meshArray[GI_shadowCompQuad]);
-
-	glBindTexture(GL_TEXTURE_2D, GI_shadowMapComp.depthID);
+	generateShadowMapGI();
 
 	//render opaque geometry
 	viewMatrix = CameraManager::lookatMatrix(GICamera, pos + norm, glm::radians(rotation)); //glm::radians(1.0f*(rand() % 180))
-	projectionMatrix = glm::perspective(3.14159 / 2.0, 1.0, .1, 1000.0);
+	if (!foliage) 
+		projectionMatrix = glm::perspective(3.14159 / 2.0, 1.0, .1, 2500.0);
+	else
+		projectionMatrix = glm::perspective(3.14159 / 2.0, 1.0, .1, 2500.0);
+
 	view_projMatrix = projectionMatrix * viewMatrix;
 	
 	
@@ -4065,14 +3561,14 @@ void Engine::samplepoint(glm::vec3 pos, glm::vec3 norm, float rotation, bool fol
 				{
 					if (!meshManager.meshArray[n].transparent)
 					{
-						meshManager.setShaderConst(n, "campos", GICamera.pos.x, GICamera.pos.y, GICamera.pos.z, 0);
+						meshManager.setShaderConst(n, "campos", GICamera.pos.x, GICamera.pos.y, GICamera.pos.z, 0.f);
 						meshManager.setShaderConst(n, "shadowMapSize", 256, 256, 0, 0);
-						meshManager.setShaderConst(n, "GI", 0, 0, 0, 1);
+						meshManager.setShaderConst(n, "GI", GI_pass, 0, 0, 1);
 						meshManager.setShaderConst(n, "reflectHeight", -5000, 0, 0, 0);
-						meshManager.setShaderConst(n, "cascadeCenter0", cascadeCenter[0].x, cascadeCenter[0].y, cascadeCenter[0].z, 0);
-						meshManager.setShaderConst(n, "cascadeCenter1", cascadeCenter[1].x, cascadeCenter[1].y, cascadeCenter[1].z, 0);
-						meshManager.setShaderConst(n, "cascadeCenter2", cascadeCenter[2].x, cascadeCenter[2].y, cascadeCenter[2].z, 0);
-						meshManager.setShaderConst(n, "cascadeCenter3", cascadeCenter[3].x, cascadeCenter[3].y, cascadeCenter[3].z, 0);
+						meshManager.setShaderConst(n, "cascadeCenter0", cascadeCenter[0].x, cascadeCenter[0].y, cascadeCenter[0].z, 0.f);
+						meshManager.setShaderConst(n, "cascadeCenter1", cascadeCenter[1].x, cascadeCenter[1].y, cascadeCenter[1].z, 0.f);
+						meshManager.setShaderConst(n, "cascadeCenter2", cascadeCenter[2].x, cascadeCenter[2].y, cascadeCenter[2].z, 0.f);
+						meshManager.setShaderConst(n, "cascadeCenter3", cascadeCenter[3].x, cascadeCenter[3].y, cascadeCenter[3].z, 0.f);
 						meshManager.setTexture(n, GI_shadowMapComp.depth, 15);
 						drawMeshGI(&meshManager.meshArray[n]);
 						meshManager.setShaderConst(n, "GI", 0, 0, 0, 0);
@@ -4108,8 +3604,235 @@ void Engine::recompileShaders()
 				meshManager.meshArray[m].shaderIndex = newIndex;
 			}
 		}
- 
-		
 	}
 	return;
+}
+
+void Engine::generateShadowMap()
+{
+
+	// render first shadow cascade
+	setRenderToTexture(shadowMap[0], 0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	// Camera matrix
+	cascadeRadius[0] = 10; //10
+	cascadeCenterDist[0] = 9.5; //9.5
+	glm::vec3 center = mainCamera.pos + mainCamera.forward*cascadeCenterDist[0];
+
+	shadowCamView[0] = lookat(center + 300.f*sundir, center, 0);
+	glm::vec3 right = glm::vec3(shadowCamView[0][0][0], shadowCamView[0][1][0], shadowCamView[0][2][0]);
+	glm::vec3 up = glm::vec3(shadowCamView[0][0][1], shadowCamView[0][1][1], shadowCamView[0][2][1]);
+
+	float shadowmapFixSize = 32;
+
+	float x = ceilf(glm::dot(center, up) * shadowmapFixSize / cascadeRadius[0]) *(cascadeRadius[0] / shadowmapFixSize);
+	float y = ceilf(glm::dot(center, right) * shadowmapFixSize / cascadeRadius[0]) *(cascadeRadius[0] / shadowmapFixSize);
+	center = up * x + right * y + sundir * glm::dot(center, sundir);
+	glm::vec3 origin = center - sundir * 300.f;
+
+	cascadeCenter[0] = center;
+
+	shadowCamView[0] = glm::lookAtRH(origin, center, up);
+	//shadowCamView[0] = lookat(cascadeCenter[0]+glm::vec3(100), cascadeCenter[0], 0)*translate(-cascadeCenter[0] -glm::vec3(100)); ;
+	shadowOrthoProj[0] = glm::ortho(-cascadeRadius[0], cascadeRadius[0], -cascadeRadius[0], cascadeRadius[0], 1.0f, 500.0f);
+	shadowViewProj[0] = shadowOrthoProj[0] * shadowCamView[0];
+
+	for (int n = 0; n < meshManager.meshCount; n++)
+	{
+		if (!meshManager.meshArray[n].transparent && meshManager.meshArray[n].castShadow)
+			drawMeshShadowMap(&meshManager.meshArray[n], 0);
+	}
+
+	// render second shadow cascade
+	setRenderToTexture(shadowMap[1], 0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+
+	cascadeRadius[1] = 50.f;
+	cascadeCenterDist[1] = 50;
+	center = mainCamera.pos + mainCamera.forward*cascadeCenterDist[1];
+
+	shadowCamView[1] = lookat(center + sundir*300.f, center, 0);
+	right = glm::vec3(shadowCamView[1][0][0], shadowCamView[1][1][0], shadowCamView[1][2][0]);
+	up = glm::vec3(shadowCamView[1][0][1], shadowCamView[1][1][1], shadowCamView[1][2][1]);
+
+	x = ceilf(glm::dot(center, up) * shadowmapFixSize / cascadeRadius[1]) *(cascadeRadius[1] / shadowmapFixSize);
+	y = ceilf(glm::dot(center, right) * shadowmapFixSize / cascadeRadius[1]) *(cascadeRadius[1] / shadowmapFixSize);
+	center = up * x + right * y + sundir * glm::dot(center, sundir);
+	origin = center - sundir * 300.f;
+
+
+	cascadeCenter[1] = center;
+	shadowCamView[1] = glm::lookAtRH(origin, center, up);
+	shadowOrthoProj[1] = glm::ortho(-cascadeRadius[1], cascadeRadius[1], -cascadeRadius[1], cascadeRadius[1], 1.0f, 500.0f);
+	shadowViewProj[1] = shadowOrthoProj[1] * shadowCamView[1];
+
+	for (int n = 0; n < meshManager.meshCount; n++)
+	{
+		if (!meshManager.meshArray[n].transparent && meshManager.meshArray[n].castShadow)
+			drawMeshShadowMap(&meshManager.meshArray[n], 1);
+	}
+
+	// render third shadow cascade
+	setRenderToTexture(shadowMap[2], 0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	cascadeRadius[2] = 220.0f;
+	cascadeCenterDist[2] = 190;
+	center = mainCamera.pos + mainCamera.forward*cascadeCenterDist[2];
+
+	shadowCamView[1] = lookat(center + sundir * 500.f, center, 0);
+	right = glm::vec3(shadowCamView[1][0][0], shadowCamView[1][1][0], shadowCamView[1][2][0]);
+	up = glm::vec3(shadowCamView[1][0][1], shadowCamView[1][1][1], shadowCamView[1][2][1]);
+
+	x = ceilf(glm::dot(center, up) * shadowmapFixSize / cascadeRadius[2]) *(cascadeRadius[2] / shadowmapFixSize);
+	y = ceilf(glm::dot(center, right) * shadowmapFixSize / cascadeRadius[2]) *(cascadeRadius[2] / shadowmapFixSize);
+	center = up * x + right * y + sundir * glm::dot(center, sundir);
+	origin = center - sundir * 500.f;
+
+	cascadeCenter[2] = center;
+	shadowCamView[2] = glm::lookAtRH(origin, center, up);
+	shadowOrthoProj[2] = glm::ortho(-cascadeRadius[2], cascadeRadius[2], -cascadeRadius[2], cascadeRadius[2], 1.0f, 1000.f);
+	shadowViewProj[2] = shadowOrthoProj[2] * shadowCamView[2];
+
+	for (int n = 0; n < meshManager.meshCount; n++)
+	{
+		if (!meshManager.meshArray[n].transparent && meshManager.meshArray[n].castShadow)
+			drawMeshShadowMap(&meshManager.meshArray[n], 2);
+	}
+
+	// render fourth shadow cascade
+	setRenderToTexture(shadowMap[3], 0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	cascadeRadius[3] = 450;
+	cascadeCenterDist[3] = 450;
+	center = mainCamera.pos + mainCamera.forward*cascadeCenterDist[3];
+
+	shadowCamView[1] = lookat(center + sundir*500.f, center, 0);
+	right = glm::vec3(shadowCamView[1][0][0], shadowCamView[1][1][0], shadowCamView[1][2][0]);
+	up = glm::vec3(shadowCamView[1][0][1], shadowCamView[1][1][1], shadowCamView[1][2][1]);
+
+	x = ceilf(glm::dot(center, up) * shadowmapFixSize / cascadeRadius[3]) *(cascadeRadius[3] / shadowmapFixSize);
+	y = ceilf(glm::dot(center, right) * shadowmapFixSize / cascadeRadius[3]) *(cascadeRadius[3] / shadowmapFixSize);
+	center = up * x + right * y + sundir * glm::dot(center, sundir);
+	origin = center - sundir * 500.f;
+
+	cascadeCenter[3] = center;
+	shadowCamView[3] = glm::lookAtRH(origin, center, up);
+	shadowOrthoProj[3] = glm::ortho(-cascadeRadius[3], cascadeRadius[3], -cascadeRadius[3], cascadeRadius[3], 1.0f, 1000.0f);
+	shadowViewProj[3] = shadowOrthoProj[3] * shadowCamView[3];
+
+	for (int n = 0; n < meshManager.meshCount; n++)
+	{
+		if (!meshManager.meshArray[n].transparent && meshManager.meshArray[n].castShadow)
+			drawMeshShadowMap(&meshManager.meshArray[n], 3);
+	}
+
+	//compile shadow maps into single buffer
+	setRenderToTexture(shadowMapComp, 0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+
+	drawMesh(&meshManager.meshArray[shadowCompQuad]);
+
+	glBindTexture(GL_TEXTURE_2D, shadowMapComp.depthID);
+	glGenerateMipmap(GL_TEXTURE_2D);
+
+}
+
+void Engine::generateShadowMapGI()
+{
+	// render first shadow cascade
+	setRenderToTexture(GI_shadowMap[0], 0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	// Camera matrix
+	cascadeRadius[0] = 10; //10
+	cascadeCenterDist[0] = 9.5; //9.5
+	glm::vec3 center = GICamera.pos + GICamera.forward*cascadeCenterDist[0];
+
+	shadowCamView[0] = lookat(center + glm::vec3(300), center, 0);
+	glm::vec3 right = glm::vec3(shadowCamView[0][0][0], shadowCamView[0][1][0], shadowCamView[0][2][0]);
+	glm::vec3 up = glm::vec3(shadowCamView[0][0][1], shadowCamView[0][1][1], shadowCamView[0][2][1]);
+	glm::vec3 direction = glm::normalize(-glm::vec3(300));
+	float shadowmapFixSize = 32;
+
+	glm::vec3 origin = center - direction * 300.f;
+
+	cascadeCenter[0] = center;
+	shadowCamView[0] = glm::lookAtRH(origin, center, up);
+	//shadowCamView[0] = lookat(cascadeCenter[0] + glm::vec3(100), cascadeCenter[0], 0)*translate(-cascadeCenter[0] -glm::vec3(100)); ;
+	shadowOrthoProj[0] = glm::ortho(-cascadeRadius[0], cascadeRadius[0], -cascadeRadius[0], cascadeRadius[0], 1.0f, 500.0f);
+	shadowViewProj[0] = shadowOrthoProj[0] * shadowCamView[0];
+
+	for (int n = 0; n < meshManager.meshCount; n++)
+	{
+		if (!meshManager.meshArray[n].transparent && meshManager.meshArray[n].castShadow)
+			drawMeshShadowMap(&meshManager.meshArray[n], 0);
+	}
+
+	// render second shadow cascade
+	setRenderToTexture(GI_shadowMap[1], 0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+
+	cascadeRadius[1] = 50.f;
+	cascadeCenterDist[1] = 50;
+	center = GICamera.pos + GICamera.forward*cascadeCenterDist[1];
+
+	shadowCamView[1] = lookat(center + glm::vec3(300), center, 0);
+	right = glm::vec3(shadowCamView[1][0][0], shadowCamView[1][1][0], shadowCamView[1][2][0]);
+	up = glm::vec3(shadowCamView[1][0][1], shadowCamView[1][1][1], shadowCamView[1][2][1]);
+	direction = glm::normalize(-glm::vec3(300));
+
+	origin = center - direction * 300.f;
+
+
+	cascadeCenter[1] = center;
+	shadowCamView[1] = glm::lookAtRH(origin, center, up);
+	shadowOrthoProj[1] = glm::ortho(-cascadeRadius[1], cascadeRadius[1], -cascadeRadius[1], cascadeRadius[1], 1.0f, 500.0f);
+	shadowViewProj[1] = shadowOrthoProj[1] * shadowCamView[1];
+
+	for (int n = 0; n < meshManager.meshCount; n++)
+	{
+		if (!meshManager.meshArray[n].transparent && meshManager.meshArray[n].castShadow)
+			drawMeshShadowMap(&meshManager.meshArray[n], 1);
+	}
+
+	// render third shadow cascade
+	setRenderToTexture(GI_shadowMap[2], 0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	cascadeRadius[2] = 200.0f;
+	cascadeCenterDist[2] = 190;
+	center = GICamera.pos + GICamera.forward*cascadeCenterDist[2];
+
+	shadowCamView[1] = lookat(center + glm::vec3(500), center, 0);
+	right = glm::vec3(shadowCamView[1][0][0], shadowCamView[1][1][0], shadowCamView[1][2][0]);
+	up = glm::vec3(shadowCamView[1][0][1], shadowCamView[1][1][1], shadowCamView[1][2][1]);
+	direction = glm::normalize(-glm::vec3(500));
+
+	origin = center - direction * 300.f;
+
+	cascadeCenter[2] = center;
+	shadowCamView[2] = glm::lookAtRH(origin, center, up);
+	shadowOrthoProj[2] = glm::ortho(-cascadeRadius[2], cascadeRadius[2], -cascadeRadius[2], cascadeRadius[2], 1.0f, 800.f);
+	shadowViewProj[2] = shadowOrthoProj[2] * shadowCamView[2];
+
+	for (int n = 0; n < meshManager.meshCount; n++)
+	{
+		if (!meshManager.meshArray[n].transparent && meshManager.meshArray[n].castShadow)
+			drawMeshShadowMap(&meshManager.meshArray[n], 2);
+	}
+
+	//compile shadow maps into single buffer
+	setRenderToTexture(GI_shadowMapComp, 0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+
+	drawMesh(&meshManager.meshArray[GI_shadowCompQuad]);
+
+
 }

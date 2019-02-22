@@ -1,10 +1,11 @@
 #include "Mesh.h"
 #include <string>
-#include "VBOIndexer.h"
+#include <map>
 #include <ctime>
 
 #include "gtc/matrix_transform.hpp"
 #include "gtx/transform.hpp"
+#include "Octree.h"
 
 using namespace ENGINE;
 
@@ -20,6 +21,8 @@ bool loadOBJ(
 	Stack< glm::vec3 > temp_colors;
 	Stack< glm::vec3 > temp_tangents;
 
+
+	printf("Loading mesh %s\n",path);
 	FILE * file = NULL;
 	fopen_s(&file, path, "r");
 	if (file == NULL)
@@ -94,6 +97,8 @@ bool loadOBJ(
 			if (!attribute[3] &&
 				!attribute[4])
 			{
+				
+
 				int a = 0;
 				matches = fscanf_s(file, "%d/%d/%d %d/%d/%d %d/%d/%d %d/%d/%d %d/%d/%d %d/%d/%d %d/%d/%d %d/%d/%d %d/%d/%d",
 					&vertexIndex[0], &uvIndex[0], &normalIndex[0],
@@ -116,6 +121,11 @@ bool loadOBJ(
 					&vertexIndex[a + 6], &uvIndex[a + 6], &normalIndex[a + 6],
 					&vertexIndex[a + 7], &uvIndex[a + 7], &normalIndex[a + 7],
 					&vertexIndex[a + 8], &uvIndex[a + 8], &normalIndex[a + 8]);
+				if (matches % 3 != 0)
+				{
+					printf("File can't be read  : ( Try exporting with other options\n");
+					return false;
+				}
 			}
 			// yes color, no tangents
 			if (attribute[3] &&
@@ -133,6 +143,11 @@ bool loadOBJ(
 					&vertexIndex[6], &uvIndex[6], &normalIndex[6], &colorIndex[6],
 					&vertexIndex[7], &uvIndex[7], &normalIndex[7], &colorIndex[7],
 					&vertexIndex[8], &uvIndex[8], &normalIndex[8], &colorIndex[8]);
+				if (matches % 4 != 0)
+				{
+					printf("File can't be read  : ( Try exporting with other options\n");
+					return false;
+				}
 			}
 			// no color, yes tangents
 			if (!attribute[3] &&
@@ -150,12 +165,13 @@ bool loadOBJ(
 					&vertexIndex[6], &uvIndex[6], &normalIndex[6], &tangentIndex[6],
 					&vertexIndex[7], &uvIndex[7], &normalIndex[7], &tangentIndex[7],
 					&vertexIndex[8], &uvIndex[8], &normalIndex[8], &tangentIndex[8]);
+				if (matches % 4 != 0)
+				{
+					printf("File can't be read  : ( Try exporting with other options\n");
+					return false;
+				}
 			}
-			if (matches % 3 != 0)
-			{
-				printf("File can't be read  : ( Try exporting with other options\n");
-				return false;
-			}
+			
 
 			// no color, no tangents
 			if (!attribute[3] &&
@@ -243,38 +259,37 @@ bool loadOBJ(
 	}
 	fclose(file);
 	
-	// For each vertex of each triangle
+	// store all vertex data
 	for (unsigned int i = 0; i < vertexIndices.size; i++)
 	{
+		VertexData vd;
 		unsigned int vertexIndex = vertexIndices.item[i];
 		glm::vec3 vertex = temp_vertices.item[vertexIndex - 1];
-		store.vertices.add(vertex);
-	}
+		vd.pos = vertex;
 
-	// For each uv of each triangle
-	for (unsigned int i = 0; i < uvIndices.size; i++)
-	{
 		unsigned int uvIndex = uvIndices.item[i];
 		glm::vec2 uv = temp_uvs.item[uvIndex - 1];
-		store.uvs.add(uv);
-	}
+		vd.uv = uv;
 
-	// For each normal of each triangle
-	for (unsigned int i = 0; i < normalIndices.size; i++)
-	{
 		unsigned int normalIndex = normalIndices.item[i];
 		glm::vec3 normal = temp_normals.item[normalIndex - 1];
-		store.normals.add(normal);
-	}
+		vd.norm = normal;
 
-	// For each color of each triangle
-	for (unsigned int i = 0; i < colorIndices.size; i++)
-	{
-		unsigned int colorIndex = colorIndices.item[i];
-		glm::vec3 color = temp_colors.item[colorIndex - 1];
-		store.colors.add(color);
-	}
+		if (colorIndices.size > 0)
+		{
+			unsigned int colorIndex = colorIndices.item[i];
+			glm::vec3 color = temp_colors.item[colorIndex - 1];
+			vd.color = color;
+			store.vertColors = true;
+		}
+		else
+		{
+			store.vertColors = false;
+		}
 
+		store.vertexData.add(vd);
+	}
+	return false;
 }
 
 // export selected mesh to obj file
@@ -287,19 +302,19 @@ void MeshManager::exportMesh(int index)
 	FILE * file = NULL;
 	fopen_s(&file, path, "w+");
 
-	Stack<unsigned short> indices = meshArray[index].indices;
+	Stack<unsigned int> indices = meshArray[index].indices;
 	Stack<glm::vec3> ind_vertex = meshArray[index].ind_vertex;
 	Stack<glm::vec2> ind_uv = meshArray[index].ind_uv;
 	Stack<glm::vec3> ind_normal = meshArray[index].ind_normal;
 	Stack<glm::vec3> ind_color = meshArray[index].ind_GI;
 
-	for (int n = 0; n < ind_vertex.size; n++)
+	for (uint n = 0; n < ind_vertex.size; n++)
 	{
 		glm::vec4 update = meshArray[index].modelMatrix * glm::vec4(ind_vertex.item[n], 1.0);
 		ind_vertex.item[n] = glm::vec3(update.x, update.y, update.z);
 	}
 
-	for (int n = 0; n < ind_normal.size; n++)
+	for (uint n = 0; n < ind_normal.size; n++)
 	{
 		glm::vec4 update = meshArray[index].transformMatrix * glm::vec4(ind_normal.item[n], 1.0);
 		ind_normal.item[n] = glm::vec3(update.x, update.y, update.z);
@@ -320,6 +335,7 @@ void MeshManager::exportMesh(int index)
 	char date[60];
 
 	char *smonth;
+	smonth = "none";
 	if (b == 1) smonth = "January";
 	if (b == 2) smonth = "February";
 	if (b == 3) smonth = "March";
@@ -332,6 +348,7 @@ void MeshManager::exportMesh(int index)
 	if (b == 10) smonth = "October";
 	if (b == 11) smonth = "November";
 	if (b == 12) smonth = "December";
+	
 
 	strcpy(date, "# Created on ");
 	strcat(date, smonth);
@@ -340,6 +357,8 @@ void MeshManager::exportMesh(int index)
 	strcat(date, ", ");
 	strcat(date, syear.c_str());
 	strcat(date, "\n");
+
+	delete smonth;
 
 	fputs(date, file);
 
@@ -392,7 +411,7 @@ void MeshManager::exportMesh(int index)
 	fputs("\n\n", file);
 
 	// add vertices
-	for (int n = 0; n < ind_vertex.size; n++)
+	for (uint n = 0; n < ind_vertex.size; n++)
 	{
 		strcpy(vert, "v  ");
 		v = std::to_string(-ind_vertex.item[n].x);
@@ -415,7 +434,7 @@ void MeshManager::exportMesh(int index)
 	fputs(vertcount, file);
 
 	// add normals
-	for (int n = 0; n < ind_normal.size; n++)
+	for (uint n = 0; n < ind_normal.size; n++)
 	{
 		strcpy(vert, "vn ");
 		v = std::to_string(-ind_normal.item[n].x);
@@ -439,7 +458,7 @@ void MeshManager::exportMesh(int index)
 
 
 	// add uvs
-	for (int n = 0; n < ind_uv.size; n++)
+	for (uint n = 0; n < ind_uv.size; n++)
 	{
 		strcpy(vert, "vt ");
 		v = std::to_string(ind_uv.item[n].x);
@@ -462,7 +481,7 @@ void MeshManager::exportMesh(int index)
 	fputs(uvcount, file);
 
 	// add colors
-	for (int n = 0; n < ind_color.size; n++)
+	for (uint n = 0; n < ind_color.size; n++)
 	{
 		strcpy(vert, "vc ");
 		v = std::to_string(ind_color.item[n].x);
@@ -494,7 +513,7 @@ void MeshManager::exportMesh(int index)
 	// no color, no tangent
 	if (ind_color.size == 0)
 	{
-		for (int n = 0; n < indices.size; n += 3)
+		for (uint n = 0; n < indices.size; n += 3)
 		{
 			strcpy(vert, "f ");
 			v = std::to_string(indices.item[n] + 1);
@@ -524,7 +543,7 @@ void MeshManager::exportMesh(int index)
 	}
 	if (ind_color.size > 0)
 	{
-		for (int n = 0; n < indices.size; n += 3)
+		for (uint n = 0; n < indices.size; n += 3)
 		{
 			strcpy(vert, "f ");
 			v = std::to_string(indices.item[n] + 1);
@@ -587,6 +606,7 @@ MeshObj::MeshObj()
 	follow = false;
 	reflectable = true;
 	isWater = false;
+	
 
 	type = STANDARD;
 	frustumCulled = false;
@@ -595,8 +615,10 @@ MeshObj::MeshObj()
 	useVertexLight = false;
 
 	for (int n = 0; n < 24; n++)
+	{
+		texIndex[n] = 0;
 		texture[n] = -2;
-
+	}
 	for (int n = 0; n < 32; n++)
 		constantArray[n] = ShaderConst();
 	constantArraySize = 32;
@@ -624,7 +646,7 @@ MeshObj::MeshObj(const MeshObj &other)
 	//name = other.name;
 	strcpy(name, other.name);
 
-	indices = Stack<unsigned short>(other.indices ,true);
+	indices = Stack<unsigned int>(other.indices ,true);
 	ind_vertex = Stack<glm::vec3>(other.ind_vertex, true);
 	ind_uv = Stack<glm::vec2>(other.ind_uv, true);
 	ind_normal = Stack<glm::vec3>(other.ind_normal, true);
@@ -671,7 +693,10 @@ MeshObj::MeshObj(const MeshObj &other)
 
 	// textures
 	for (int n = 0; n < 24; n++)
+	{
 		texture[n] = other.texture[n];
+		texIndex[n] = other.texIndex[n];
+	}
 	//shader = other.shader;
 	shaderIndex = other.shaderIndex;
 
@@ -721,6 +746,11 @@ MeshObj MeshObj::instanceCopy()
 	return temp;
 }
 
+void MeshObj::clear()
+{
+
+}
+
 void MeshObj::setShaderConst(Shader *shader, char *name, float v0, float v1, float v2, float v3)
 {
 	GLint loc;
@@ -736,16 +766,19 @@ void MeshObj::setShaderConst(Shader *shader, char *name, float v0, float v1, flo
 	{
 		if (constantArray[n].name != NULL)
 		{
-			if (strcmp(name, constantArray[n].name) == 0)
+			if (strlen(name) == strlen(constantArray[n].name))
 			{
-				constantArray[n].v[0] = v0;
-				constantArray[n].v[1] = v1;
-				constantArray[n].v[2] = v2;
-				constantArray[n].v[3] = v3;
-				constantArray[n].location = loc;
-				constantArray[n].s_type = type;
+				if (strcmp(name, constantArray[n].name) == 0)
+				{
+					constantArray[n].v[0] = v0;
+					constantArray[n].v[1] = v1;
+					constantArray[n].v[2] = v2;
+					constantArray[n].v[3] = v3;
+					constantArray[n].location = loc;
+					constantArray[n].s_type = type;
 
-				return;
+					return;
+				}
 			}
 		}
 	}
@@ -775,12 +808,15 @@ void MeshObj::setShaderMat(Shader *shader, char *name, glm::mat4 val)
 	{
 		//if (constantMatArray[n].name != NULL)
 		{
-			if (strcmp(name, constantMatArray[n].name) == 0)
+			if (strlen(name) == strlen(constantMatArray[n].name))
 			{
-				constantMatArray[n].value = val;
-				constantMatArray[n].location = loc;
+				if (strcmp(name, constantMatArray[n].name) == 0)
+				{
+					constantMatArray[n].value = val;
+					constantMatArray[n].location = loc;
 
-				return;
+					return;
+				}
 			}
 		}
 	}
@@ -861,7 +897,7 @@ void MeshObj::calcMinMax()
 {
 	// find minimum values in mesh vertices
 	minpos = glm::vec3(100000.0f);
-	for (int n = 0; n < indices.size; n++)
+	for (uint n = 0; n < indices.size; n++)
 	{
 		int index = indices.item[n];
 		if (ind_vertex.item[index].x < minpos.x) minpos.x = ind_vertex.item[index].x;
@@ -871,7 +907,7 @@ void MeshObj::calcMinMax()
 
 	// find maximum values in mesh vertices
 	maxpos = glm::vec3(-100000.0f);
-	for (int n = 0; n < indices.size; n++)
+	for (uint n = 0; n < indices.size; n++)
 	{
 		int index = indices.item[n];
 		if (ind_vertex.item[index].x > maxpos.x) maxpos.x = ind_vertex.item[index].x;
@@ -1108,7 +1144,7 @@ glm::mat4 MeshObj::updateModelMatrix(glm::mat4 transform)
 glm::mat4 MeshObj::lookat(glm::vec3 lookatpos, float z_rotation)
 {
 	glm::vec3 lookvec = lookatpos - pos;
-	float x_rotation = -3.1415/2.0+atan2(glm::length(glm::vec2(lookvec.x, lookvec.z)), lookvec.y);
+	float x_rotation = -3.1415f/2.0f+atan2(glm::length(glm::vec2(lookvec.x, lookvec.z)), lookvec.y);
 	float y_rotation = atan2(lookvec.x, lookvec.z);
 
 
@@ -1188,7 +1224,7 @@ void MeshObj::updateShaderUniforms(Shader *shader)
 // calculate mesh tangent and binormals
 void MeshObj::getTangents()
 {
-	for (int index = 0; index < indices.size; index += 3)
+	for (uint index = 0; index < indices.size; index += 3)
 	{
 		glm::vec3 v0 = ind_vertex.item[indices.item[index]];
 		glm::vec3 v1 = ind_vertex.item[indices.item[index + 1]];
@@ -1245,12 +1281,17 @@ int MeshManager::loadMesh(char *name)
 	//check to see if shader already exists
 	for (int n = 0; n < meshCount; n++)
 	{
-		int a = strcmp(meshArray[n].name, name);
-		if (a == 0) return n;
+		if (strlen(name) == strlen(name))
+		{
+			int a = strcmp(meshArray[n].name, name);
+			if (a == 0) return n;
+		}
 	}
-	// if we're still here that means the shader doesn't exist. proceed in loading
+
 
 	MeshObj temp;
+
+
 
 	char * ext;
 	char filename[1024];
@@ -1259,6 +1300,7 @@ int MeshManager::loadMesh(char *name)
 	ext = strtok(filename, ".");
 	ext = strtok(NULL, ".");
 
+	
 
 	if ( strcmp(ext, "obj") == 0 )
 	{
@@ -1267,11 +1309,12 @@ int MeshManager::loadMesh(char *name)
 		MeshFileData store;
 		exist = loadOBJ(name, store);
 
-		
-		indexVBO(store.vertices, store.uvs, store.normals, store.colors, store.tangents, temp.indices, temp.ind_vertex, temp.ind_uv, temp.ind_normal, temp.ind_GI, temp.ind_tangent);
+
+
+		indexVBO(store, temp.indices, temp.ind_vertex, temp.ind_uv, temp.ind_normal, temp.ind_GI);
 		if (temp.ind_GI.size > 0) {
-			printf("\n\n\n\n lighting works \n\n\n\n\n");
 			temp.useVertexLight = true;
+
 		}
 		//temp.ind_GI = Stack<glm::vec3>(temp.indices.size);
 		temp.ind_tangent = Stack<glm::vec3>(temp.indices.size);
@@ -1319,7 +1362,7 @@ int MeshManager::loadMesh(char *name)
 
 		glGenBuffers(1, &temp.elementBuffer);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, temp.elementBuffer);
-		glBufferData(GL_ELEMENT_ARRAY_BUFFER, temp.indices.size * sizeof(unsigned short), &temp.indices.item[0], GL_STATIC_DRAW);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, temp.indices.size * sizeof(unsigned int), &temp.indices.item[0], GL_STATIC_DRAW);
 
 		temp.shaderIndex = defaultShader;// &shaderManager->shaderArray[defaultShader];
 		temp.texture[0] = textureManager->texArray[defaultTexture].id;
@@ -1357,11 +1400,9 @@ int MeshManager::createPlane(glm::vec2 size)
 	Stack<glm::vec3> tangent;
 
 	vertex.add( glm::vec3(.5*size.x, -.5*size.y, 0) );
-	
 	vertex.add(glm::vec3(.5*size.x, .5*size.y, 0));
 	vertex.add(glm::vec3(-.5*size.x, .5*size.y, 0));
 	vertex.add( glm::vec3(.5*size.x, -.5*size.y, 0) );
-	
 	vertex.add(glm::vec3(-.5*size.x, .5*size.y, 0));
 	vertex.add(glm::vec3(-.5*size.x, -.5*size.y, 0));
 
@@ -1381,32 +1422,31 @@ int MeshManager::createPlane(glm::vec2 size)
 	normal.add( glm::vec3(0, 0, 1) );
 	normal.add( glm::vec3(0, 0, 1) );
 
-	tangent.add(glm::vec3(1, 0, 0));
-	tangent.add(glm::vec3(1, 0, 0));
-	tangent.add(glm::vec3(1, 0, 0));
-	tangent.add(glm::vec3(1, 0, 0));
-	tangent.add(glm::vec3(1, 0, 0));
-	tangent.add(glm::vec3(1, 0, 0));
-
 	color.add(glm::vec3(1));
 	color.add(glm::vec3(1));
 	color.add(glm::vec3(1));
 	color.add(glm::vec3(1));
 	color.add(glm::vec3(1));
 	color.add(glm::vec3(1));
-
-	normal.add(glm::vec3(0, 0, 1));
-	normal.add(glm::vec3(0, 0, 1));
-	normal.add(glm::vec3(0, 0, 1));
-	normal.add(glm::vec3(0, 0, 1));
-	normal.add(glm::vec3(0, 0, 1));
-	normal.add(glm::vec3(0, 0, 1));
 
 	MeshObj temp;
 	//temp.name = "gen plane";
 	strcpy(temp.name, "gen plane");
 
-	indexVBO(vertex, uv, normal, color, tangent, temp.indices, temp.ind_vertex, temp.ind_uv, temp.ind_normal, temp.ind_GI, temp.ind_tangent);
+	MeshFileData store;
+	for (int n = 0; n < 6; n++)
+	{
+		VertexData vd;
+		vd.pos = vertex.item[n];
+		vd.uv = uv.item[n];
+		vd.norm = normal.item[n];
+		vd.color = color.item[n];
+
+		store.vertexData.add(vd);
+	}
+
+
+	//indexVBO(store, temp.indices, temp.ind_vertex, temp.ind_uv, temp.ind_normal, temp.ind_GI);
 
 	GLuint VertexArrayID;
 	glGenVertexArrays(1, &VertexArrayID);
@@ -1439,7 +1479,7 @@ int MeshManager::createPlane(glm::vec2 size)
 
 	glGenBuffers(1, &temp.elementBuffer);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, temp.elementBuffer);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, temp.indices.size * sizeof(unsigned short), &temp.indices.item[0], GL_STATIC_DRAW);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, temp.indices.size * sizeof(unsigned int), &temp.indices.item[0], GL_STATIC_DRAW);
 
 	temp.shaderIndex = defaultShader; // &shaderManager->shaderArray[defaultShader];
 	temp.texture[0] = textureManager->texArray[defaultTexture].id;
@@ -1516,13 +1556,25 @@ int MeshManager::createLine3(glm::vec3 p0, glm::vec3 p1, float weight)
 	normal.add(glm::vec3(1, 0, 0));
 	normal.add(glm::vec3(1, 0, 0));
 	normal.add(glm::vec3(1, 0, 0));
+	/*
+	MeshFileData store;
+	for (int n = 0; n < 12; n++)
+	{
+		VertexData vd;
+		vd.pos = vertex.item[n];
+		vd.uv = uv.item[n];
+		vd.norm = normal.item[n];
+		vd.color = color.item[n];
 
-
+		store.vertexData.add(vd);
+	}
+	store.vertColors = true;
+	*/
 	MeshObj temp;
 	//temp.name = "gen plane";
 	strcpy(temp.name, "gen line");
 
-	indexVBO(vertex, uv, normal, color, tangent, temp.indices, temp.ind_vertex, temp.ind_uv, temp.ind_normal, temp.ind_GI, temp.ind_tangent);
+	//indexVBO(store, temp.indices, temp.ind_vertex, temp.ind_uv, temp.ind_normal, temp.ind_GI);
 
 	temp.pos = p0;
 	temp.scale = glm::vec3(1, 1, size);
@@ -1564,7 +1616,7 @@ int MeshManager::createLine3(glm::vec3 p0, glm::vec3 p1, float weight)
 
 	glGenBuffers(1, &temp.elementBuffer);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, temp.elementBuffer);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, temp.indices.size * sizeof(unsigned short), &temp.indices.item[0], GL_STATIC_DRAW);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, temp.indices.size * sizeof(unsigned int), &temp.indices.item[0], GL_STATIC_DRAW);
 
 	Shader *shader = &shaderManager->shaderArray[lineShader];
 
@@ -1691,6 +1743,16 @@ bool MeshManager::raycastAllMesh( glm::vec3 p0, glm::vec3 p1)
 					raycastDataArray[raycastHitCount - 1].meshInd = id;
 					raycastDataArray[raycastHitCount - 1].pos = meshArray[id].modelMatrix * glm::vec4(raycastDataArray[raycastHitCount - 1].pos, 1);
 					raycastDataArray[raycastHitCount - 1].raylength = glm::length(raycastDataArray[raycastHitCount - 1].pos - p0);
+
+					//get uv data at position
+					glm::vec2 uv0 = meshArray[id].ind_uv.item[raycast_index[0]];
+					glm::vec2 uv1 = meshArray[id].ind_uv.item[raycast_index[1]];
+					glm::vec2 uv2 = meshArray[id].ind_uv.item[raycast_index[2]];
+
+					glm::vec3 interpolation = interpolateTriangle( raycast_vert[0], raycast_vert[1], raycast_vert[2], raycastDataArray[raycastHitCount - 1].pos);
+
+					glm::vec2 uv = uv0 * interpolation.x + uv1 * interpolation.y + uv2 * interpolation.z;
+					raycastDataArray[raycastHitCount - 1].uv = uv;
 				}
 			}
 		}
@@ -1702,13 +1764,58 @@ bool MeshManager::raycastAllMesh( glm::vec3 p0, glm::vec3 p1)
 	return false;
 }
 
+glm::vec3 MeshManager::interpolateTriangle(glm::vec3 v0, glm::vec3 v1, glm::vec3 v2, glm::vec3 p)
+{
+	float abc = glm::length(glm::cross(v2 - v0, v1 - v0));
+	float a = length(glm::cross(v1 - p, v2 - p)) / abc;
+	float b = length(glm::cross(v0 - p, v2 - p)) / abc;
+	float c = length(glm::cross(v0 - p, v1 - p)) / abc;
+
+	return glm::vec3(a, b, c);
+}
+
+
+glm::vec4 MeshManager::textureValueFromUV(int id, glm::vec2 uv, int texid)
+{
+	glActiveTexture(GL_TEXTURE16);
+	int tex = meshArray[id].texture[texid];
+
+	TextureObj texObj = textureManager->texArray[meshArray[id].texIndex[texid]];
+	glm::vec2 size = texObj.size;
+
+	printf("%d .. %f %f \n", meshArray[id].texIndex[texid], size.x, size.y);
+
+	glBindTexture(GL_TEXTURE_2D, tex);
+
+
+	GLfloat *pixeldata = new GLfloat[int(4*size.x*size.y)] ;
+
+	glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, pixeldata);
+	
+
+	int x = floor(uv.x * size.x);
+	int y = floor(uv.y * size.y);
+	int pos = 4* (x % int(size.x) + y * int(size.x));
+
+	float r = pixeldata[pos];
+	float g = pixeldata[pos + 1];
+	float b = pixeldata[pos + 2];
+	float a = pixeldata[pos + 3];
+
+	delete[] pixeldata;
+
+	return glm::vec4(r,g,b,a);
+}
+
+
 bool MeshManager::raycastAllMeshIgnoreStates(glm::vec3 p0, glm::vec3 p1)
 {
+	
 	raycastHitCount = 0;
 
 	for (int id = 0; id < meshCount; id++)
 	{
-		if (meshArray[id].collision && meshArray[id].type != EDITOR)
+		if (meshArray[id].type != EDITOR)
 		{
 			glm::vec3 offset = -meshArray[id].pos;
 			glm::vec3 scale = 1.0f/meshArray[id].scale;
@@ -1777,10 +1884,23 @@ bool MeshManager::raycastAllMeshIgnoreStates(glm::vec3 p0, glm::vec3 p1)
 				if (raycastTriangle(startPos, endPos, raycast_vert[0], raycast_vert[1], raycast_vert[2]))
 				{	
 					//printf("%f -> ", raycastDataArray[raycastHitCount - 1].pos.y);
+					printf("%d \n", raycastHitCount);
 					raycastDataArray[raycastHitCount - 1].meshInd = id;
 					raycastDataArray[raycastHitCount - 1].pos = meshArray[id].modelMatrix * glm::vec4(raycastDataArray[raycastHitCount - 1].pos, 1);
 					raycastDataArray[raycastHitCount - 1].raylength = glm::length(raycastDataArray[raycastHitCount - 1].pos -p0);
 					
+					//get uv data at position
+					glm::vec2 uv0 = meshArray[id].ind_uv.item[raycast_index[0]];
+					glm::vec2 uv1 = meshArray[id].ind_uv.item[raycast_index[1]];
+					glm::vec2 uv2 = meshArray[id].ind_uv.item[raycast_index[2]];
+
+					glm::vec3 interpolation = interpolateTriangle(raycast_vert[0], raycast_vert[1], raycast_vert[2], raycastDataArray[raycastHitCount - 1].pos);
+
+					glm::vec2 uv = uv0 * interpolation.x + uv1 * interpolation.y + uv2 * interpolation.z;
+					raycastDataArray[raycastHitCount - 1].uv = uv;
+
+
+
 				}
 			}
 		}
@@ -1874,7 +1994,6 @@ bool MeshManager::spherecastAllMesh(glm::vec3 center, float radius)
 		glm::vec4 np0 = transform * glm::vec4(center, 1);
 		glm::vec3 newcenter = glm::vec3(np0.x, np0.y, np0.z);
 
-		bool hit;
 
 		if (meshArray[id].collision)
 		{
@@ -2103,7 +2222,7 @@ bool MeshManager::spherecastTriangle(glm::vec3 center, float radius, glm::vec3 v
 	norm = -raydir;
 
 	planeOffset = glm::dot(norm, center);
-	t = (glm::dot(-v0, norm) + planeOffset) / -1.0;
+	t = (glm::dot(-v0, norm) + planeOffset) / -1.0f;
 
 	intersectionPoint = v0 + raydir*t;
 
@@ -2122,7 +2241,7 @@ bool MeshManager::spherecastTriangle(glm::vec3 center, float radius, glm::vec3 v
 	norm = -raydir;
 
 	planeOffset = glm::dot(norm, center);
-	t = ( glm::dot(-v0, norm) + planeOffset ) / -1.0;
+	t = ( glm::dot(-v0, norm) + planeOffset ) / -1.0f;
 
 	intersectionPoint = v0 + raydir*t;
 
@@ -2141,7 +2260,7 @@ bool MeshManager::spherecastTriangle(glm::vec3 center, float radius, glm::vec3 v
 	norm = -raydir;
 
 	planeOffset = glm::dot(norm, center);
-	t = (glm::dot(-v1, norm) + planeOffset) / -1.0;
+	t = (glm::dot(-v1, norm) + planeOffset) / -1.0f;
 
 	intersectionPoint = v1 + raydir*t;
 
@@ -2243,9 +2362,12 @@ void MeshManager::setShader(unsigned int meshIndex, unsigned int shaderIndex)
 	return;
 }
 
-void MeshManager::setTexture(int index, int texID, int texIndex)
+// set the texture index and id for 
+// a specific slot in the given mesh
+void MeshManager::setTexture(int index, int texInd, int textureSlot)
 {
-	meshArray[index].texture[texIndex] = textureManager->texArray[texID].id;
+	meshArray[index].texIndex[textureSlot] = texInd;
+	meshArray[index].texture[textureSlot] = textureManager->texArray[texInd].id;
 }
 
 void MeshManager::setPosition(int index, glm::vec3 pos)
@@ -2438,28 +2560,28 @@ int MeshManager::attach(int index0, int index1)
 	temp.ind_uv.clean();
 	temp.ind_normal.clean();
 
-	Stack<unsigned short> secondIndexSet(meshArray[index1].indices, true);
+	Stack<unsigned int> secondIndexSet(meshArray[index1].indices, true);
 	Stack<glm::vec3> firstVertexSet( meshArray[index0].ind_vertex, true);
 	Stack<glm::vec3> secondVertexSet(meshArray[index1].ind_vertex, true);
 
 	// unify position attribute
-	for (int n = 0; n < meshArray[index0].ind_vertex.size; n++)
+	for (uint n = 0; n < meshArray[index0].ind_vertex.size; n++)
 	{
 		firstVertexSet.item[n] += meshArray[index0].pos;
 	}
-	for (int n = 0; n < meshArray[index1].ind_vertex.size; n++)
+	for (uint n = 0; n < meshArray[index1].ind_vertex.size; n++)
 	{
 		secondVertexSet.item[n] += meshArray[index1].pos;
 	}
 	temp.pos = glm::vec3(0);
 
 
-	for (int n = 0; n < meshArray[index1].indices.size; n++)
+	for (uint n = 0; n < meshArray[index1].indices.size; n++)
 	{
 		secondIndexSet.item[n] += meshArray[index0].ind_vertex.size;
 	}
 	
-	temp.indices = Stack<unsigned short>::add(meshArray[index0].indices, secondIndexSet);
+	temp.indices = Stack<unsigned int>::add(meshArray[index0].indices, secondIndexSet);
 	temp.ind_vertex = Stack<glm::vec3>::add(firstVertexSet, secondVertexSet);
 	temp.ind_uv = Stack<glm::vec2>::add(meshArray[index0].ind_uv, meshArray[index1].ind_uv);
 	temp.ind_normal = Stack<glm::vec3>::add(meshArray[index0].ind_normal, meshArray[index1].ind_normal);
@@ -2487,7 +2609,7 @@ int MeshManager::attach(int index0, int index1)
 	// Generate a buffer for the indices as well
 	glGenBuffers(1, &temp.elementBuffer);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, temp.elementBuffer);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, temp.indices.size * sizeof(unsigned short), &temp.indices.item[0], GL_STATIC_DRAW);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, temp.indices.size * sizeof(unsigned int), &temp.indices.item[0], GL_STATIC_DRAW);
 	
 	temp.id = assignID();
 	return add(temp);
@@ -2600,6 +2722,53 @@ void MeshManager::setShaderConst(int meshIndex, char *name, float v0, float v1, 
 	MeshObj *mesh = &meshArray[meshIndex];
 	int MMconstantCount = mesh->constantCount;
 	
+
+	// check if uniform name already exists on this object
+	for (int n = 0; n < MMconstantCount; n++)
+	{
+		if (meshArray[meshIndex].constantArray[n].name != NULL)
+		{
+			if (strcmp(name, meshArray[meshIndex].constantArray[n].name) == 0)
+			{
+				mesh->constantArray[n].v[0] = v0;
+				mesh->constantArray[n].v[1] = v1;
+				mesh->constantArray[n].v[2] = v2;
+				mesh->constantArray[n].v[3] = v3;
+				mesh->constantArray[n].location = loc;
+				mesh->constantArray[n].s_type = type;
+
+				return;
+			}
+		}
+	}
+
+	// if uniform name does not already exist... add it
+	mesh->constantArray[MMconstantCount].name = name;
+	mesh->constantArray[MMconstantCount].v[0] = v0;
+	mesh->constantArray[MMconstantCount].v[1] = v1;
+	mesh->constantArray[MMconstantCount].v[2] = v2;
+	mesh->constantArray[MMconstantCount].v[3] = v3;
+	mesh->constantArray[MMconstantCount].location = loc;
+	mesh->constantArray[MMconstantCount].s_type = type;
+
+	mesh->constantCount++;
+
+	return;
+}
+
+void MeshManager::setShaderConst(int meshIndex, char *name, int v0, int v1, int v2, int v3)
+{
+	GLint loc;
+	unsigned char type;
+
+	Shader *shader = &shaderManager->shaderArray[meshArray[meshIndex].shaderIndex];
+
+	loc = shader->getUniformLocation(name);
+	type = shader->getUniformType(name);
+
+	MeshObj *mesh = &meshArray[meshIndex];
+	int MMconstantCount = mesh->constantCount;
+
 
 	// check if uniform name already exists on this object
 	for (int n = 0; n < MMconstantCount; n++)
@@ -2768,3 +2937,192 @@ void MeshManager::frustumCull(Camera cam, glm::mat4 proj, glm::vec2 res)
 		}
 	}
 }
+
+// Returns true iif v1 can be considered equal to v2
+bool is_near(float v1, float v2)
+{
+	return fabs(v1 - v2) < 0.01f;
+}
+
+// Searches through all already-exported vertices
+// for a similar one.
+// Similar = same position + same UVs + same normal
+bool getSimilarVertexIndex(
+	glm::vec3 & in_vertex,
+	glm::vec2 & in_uv,
+	glm::vec3 & in_normal,
+	glm::vec3 & in_colors,
+	Stack<glm::vec3> & out_vertices,
+	Stack<glm::vec2> & out_uvs,
+	Stack<glm::vec3> & out_normals,
+	Stack<glm::vec3> & out_colors,
+
+	unsigned int & result
+)
+{
+	// Lame linear search
+	for (unsigned int i = 0; i<out_vertices.size; i++)
+	{
+		if (
+			is_near(in_vertex.x, out_vertices.item[i].x) &&
+			is_near(in_vertex.y, out_vertices.item[i].y) &&
+			is_near(in_vertex.z, out_vertices.item[i].z) &&
+
+			is_near(in_uv.x, out_uvs.item[i].x) &&
+			is_near(in_uv.y, out_uvs.item[i].y) &&
+
+			is_near(in_normal.x, out_normals.item[i].x) &&
+			is_near(in_normal.y, out_normals.item[i].y) &&
+			is_near(in_normal.z, out_normals.item[i].z) &&
+
+			is_near(in_colors.x, out_colors.item[i].x) &&
+			is_near(in_colors.y, out_colors.item[i].y) &&
+			is_near(in_colors.z, out_colors.item[i].z)
+			)
+		{
+			result = i;
+			return true;
+		}
+	}
+	// No other vertex could be used instead.
+	// Looks like we'll have to add it to the VBO.
+	return false;
+}
+
+void indexVBO_slow(
+	Stack<glm::vec3> & in_vertices,
+	Stack<glm::vec2> & in_uvs,
+	Stack<glm::vec3> & in_normals,
+	Stack<glm::vec3> & in_colors,
+
+	Stack<unsigned int> & out_indices,
+	Stack<glm::vec3> & out_vertices,
+	Stack<glm::vec2> & out_uvs,
+	Stack<glm::vec3> & out_normals,
+	Stack<glm::vec3> & out_colors
+)
+{
+	// For each input vertex
+	for (unsigned int i = 0; i<in_vertices.size; i++)
+	{
+
+		// Try to find a similar vertex in out_XXXX
+		unsigned int index;
+		bool found = getSimilarVertexIndex(in_vertices.item[i], in_uvs.item[i], in_normals.item[i], in_colors.item[i], out_vertices, out_uvs, out_normals, out_colors, index);
+
+		if (found)
+		{ // A similar vertex is already in the VBO, use it instead !
+			out_indices.add(index);
+		}
+		else { // If not, it needs to be added in the output data.
+			out_vertices.add(in_vertices.item[i]);
+			out_uvs.add(in_uvs.item[i]);
+			out_normals.add(in_normals.item[i]);
+			out_indices.add((unsigned int)out_vertices.size - 1);
+		}
+	}
+}
+
+
+
+bool getSimilarVertexIndex_fast(
+	PackedVertex & packed,
+	std::map<PackedVertex, unsigned int> & VertexToOutIndex,
+	unsigned int & result
+)
+{
+	std::map<PackedVertex, unsigned int>::iterator it = VertexToOutIndex.find(packed);
+	if (it == VertexToOutIndex.end())
+	{
+		return false;
+	}
+	else
+	{
+		result = it->second;
+		return true;
+	}
+}
+
+void MeshManager::indexVBO(
+	MeshFileData in_data,
+
+	Stack<unsigned int> & out_indices,
+	Stack<glm::vec3> & out_vertices,
+	Stack<glm::vec2> & out_uvs,
+	Stack<glm::vec3> & out_normals,
+	Stack<glm::vec3> & out_colors
+)
+{
+	//Octree<VertexData> octree(in_data.minpos, in_data.maxpos,2);
+	indexTree.clean(indexTree.root);
+	indexTree.minbound = in_data.minpos;
+	indexTree.maxbound = in_data.maxpos;
+
+	
+	for (int n = 0; n < in_data.vertexData.size; n++)
+	{
+		int ind = indexTree.search(in_data.vertexData.item[n]);
+
+		if (ind != -1)
+		{
+			out_indices.add(ind);
+			//in_data.vertexData.item[n].index = ind;
+		}
+		else
+		{
+
+			unsigned int newindex = (unsigned int)out_vertices.size ;
+			out_indices.add(newindex);
+			in_data.vertexData.item[n].index = newindex;
+
+			indexTree.add(in_data.vertexData.item[n]);
+
+			out_vertices.add(in_data.vertexData.item[n].pos);
+			out_uvs.add(in_data.vertexData.item[n].uv);
+			out_normals.add(in_data.vertexData.item[n].norm);
+			if (in_data.vertColors) out_colors.add(in_data.vertexData.item[n].color);
+		}
+
+	}
+	
+
+	/*
+	std::map<PackedVertex, unsigned int> VertexToOutIndex;
+
+	PackedVertex packed;
+	// For each input vertex
+	for (unsigned int i = 0; i<in_data.vertexData.size; i++)
+	{
+
+
+		packed.position = in_data.vertexData.item[i].pos;
+		packed.uv = in_data.vertexData.item[i].uv;
+		packed.normal = in_data.vertexData.item[i].norm;
+		if (in_data.vertColors) packed.color = in_data.vertexData.item[i].color;
+
+
+		// Try to find a similar vertex in out_XXXX
+		unsigned int index;
+		bool found = getSimilarVertexIndex_fast(packed, VertexToOutIndex, index);
+
+
+		if (found)
+		{ // A similar vertex is already in the VBO, use it instead !
+			out_indices.add(index);
+
+		}
+		else
+		{ // If not, it needs to be added in the output data.
+			out_vertices.add(in_data.vertexData.item[i].pos);
+			out_uvs.add(in_data.vertexData.item[i].uv);
+			out_normals.add(in_data.vertexData.item[i].norm);
+			if (in_data.vertColors) out_colors.add(in_data.vertexData.item[i].color);
+
+			unsigned int newindex = (unsigned int)out_vertices.size - 1;
+			out_indices.add(newindex);
+			VertexToOutIndex[packed] = newindex;
+		}
+	}
+	*/
+}
+

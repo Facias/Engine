@@ -15,7 +15,7 @@
 //#include <nvtt.h>
 
 #include "controls.h"
-#include "Text2D.h"
+#include "Text.h"
 #include "Mesh.h"
 #include "Texture.h"
 #include "Shader.h"
@@ -23,14 +23,16 @@
 #include "Camera.h"
 #include "SceneScript.h"
 #include "Sprite.h"
-#include "Network.h"
+//#include "Network.h"
 
 #include "Octree.h"
 #include "Editor.h"
 
 
-#define WIDTH 1920
-#define HEIGHT 1080
+
+
+#define WIDTH 1600
+#define HEIGHT 900
 
 #define completePastWritesBeforeFutureWrites _WriteBarrier(); _mm_sfence()
 #define completePastReadsBeforeFutureReads _ReadBarrier()
@@ -164,7 +166,7 @@ namespace ENGINE
 		double getFrameRate();
 		void updateFrameTimeInfo();
 
-		Network network;
+		//Network network;
 		TextureManager textureManager;
 
 		void setVSync(char state);
@@ -175,7 +177,8 @@ namespace ENGINE
 		void setResolution(int width, int height);
 
 		
-		
+		void generateShadowMap();
+		void generateShadowMapGI();
 
 		//string methods
 		char* strToChar(std::string str);
@@ -238,7 +241,7 @@ namespace ENGINE
 		glm::mat4 shadowViewProj[4];
 		glm::mat4 mvp_shadow;
 		glm::vec3 cascadeCenter[4];
-		float shadowmapRes;
+		unsigned short int shadowmapRes;
 		float cascadeRadius[4]; // radius of cascade sphere
 		float cascadeCenterDist[4]; // distance from camera to cascade center
 		short int shadowCompShader;
@@ -247,21 +250,21 @@ namespace ENGINE
 		//GI shadows
 		RenderTexture GI_shadowMap[4];
 		RenderTexture GI_shadowMapComp;
-		float GI_shadowmapRes;
+		unsigned short int GI_shadowmapRes;
 		int GI_shadowCompQuad;
 		
 
 		//global illumination
 		RenderTexture lightSampleGIBuffer[5];
 		void SampleVertexGI(MeshObj *mesh, bool doublesided);
-		int createLightMap(MeshObj *mesh, float size);
+		//int createLightMap(MeshObj *mesh, float size);
 		Camera GICamera;
 		bool pointInTriangleUV(glm::vec2 uv0, glm::vec2 uv1, glm::vec2 uv2, glm::vec2 point);
 		glm::vec3 interpolateTriangle(glm::vec3 vert0, glm::vec3 vert1, glm::vec3 vert2, glm::vec3 point);
 		glm::vec3 interpolateTriangleUV(glm::vec2 uv0, glm::vec2 uv1, glm::vec2 uv2, glm::vec2 point);
 		bool moe(float input, float check, float margin);
 		Stack<GISamplePoint> gisamplepoint;
-		void samplepoint(glm::vec3 pos, glm::vec3 norm, float rotation, bool foliage);
+		void samplepoint(glm::vec3 pos, glm::vec3 norm, float rotation, bool foliage, char GI_pass);
 
 		glm::mat4 newView[4];
 		glm::mat4 newViewProj[4];
@@ -269,6 +272,11 @@ namespace ENGINE
 		static float area_element(float x, float y);
 		static float solid_angle_term(const glm::vec2 & f, int cube_size);
 		static float clamped_cosine_term(const glm::vec3 & dir);
+
+		// color correction
+		int colorGradeQuad;
+		int colorGradeShader;
+		void colorGrading(GLuint input, RenderTexture output);
 
 		// bloom
 		RenderTexture bloomBuffer[2];
@@ -298,6 +306,8 @@ namespace ENGINE
 
 
 		Camera sunCamera;
+		glm::vec3 sunpos;
+		glm::vec3 sundir;
 		
 		glm::mat4 look_right, look_left, look_up, look_down;
 
@@ -318,7 +328,7 @@ namespace ENGINE
 
 		//render 3d
 		glm::mat4 mvp;
-		float reflectionHeight = .9f;
+		float reflectionHeight = .0f;
 
 		Controls control;
 		GLFWwindow *window;
@@ -375,7 +385,7 @@ namespace ENGINE
 		Shader * shaderState;
 		GLint textureStateID[16];
 		Shader *hold; // rendertime shader swapping
-		glm::vec2 res;
+		glm::ivec2 res;
 
 	
 
@@ -391,9 +401,20 @@ namespace ENGINE
 		SortItem2D *sorting2DArray;
 		int sorting2DCount;
 		//float aspectRatio;
-
-		void frustumCull(Camera cam);
 		
+		// frustum culling
+		void frustumCull(Camera cam);
+		bool frustumCull_check[8];
+		glm::ivec2 frustumCull_state[8];
+		glm::vec4 frustumCull_pos;
+		bool frustumCull_passx = false;
+		bool frustumCull_passy = false;
+		int frustumCull_leftcount = 0;
+		int frustumCull_rightcount = 0;
+		int frustumCull_abovecount = 0;
+		int frustumCull_belowcount = 0;
+		glm::vec3 frustumCull_vert[8];
+
 
 		char processorCount;
 	};
