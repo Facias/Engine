@@ -28,6 +28,8 @@ namespace ENGINE
 		bool mipmapCreated;
 		float anisotropy;
 		glm::vec2 size;
+
+		bool exists;
 	};
 
 	struct RenderTexture
@@ -110,21 +112,18 @@ namespace ENGINE
 	{
 		TextureManager()
 		{
-			texArray = new TextureObj[16];
-			texCount = 0;
-			arraySize = 16;
-
+		
 			blank = loadImage("white.png");
 		}
 
-		TextureObj *texArray;
-		unsigned short int arraySize;
-		unsigned short int texCount;
+		Stack<TextureObj> texArray;
 
-		int add(TextureObj item);
 		int loadImage(char *name);
+		void deleteImage(int index);
+		void deleteImages(int *index, int count);
 
 		void setWrap(int index, bool u, bool v);
+
 
 		GLint loadDDS(const char *imagepath);
 		GLint loadBMP_custom(const char *imagepath);
@@ -136,5 +135,8 @@ namespace ENGINE
 		int blank;
 	};
 }
+
+
+
 
 #endif

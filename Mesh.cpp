@@ -22,7 +22,7 @@ bool loadOBJ(
 	Stack< glm::vec3 > temp_tangents;
 
 
-	printf("Loading mesh %s\n",path);
+	//printf("Loading mesh %s\n",path);
 	FILE * file = NULL;
 	fopen_s(&file, path, "r");
 	if (file == NULL)
@@ -1365,7 +1365,7 @@ int MeshManager::loadMesh(char *name)
 		glBufferData(GL_ELEMENT_ARRAY_BUFFER, temp.indices.size * sizeof(unsigned int), &temp.indices.item[0], GL_STATIC_DRAW);
 
 		temp.shaderIndex = defaultShader;// &shaderManager->shaderArray[defaultShader];
-		temp.texture[0] = textureManager->texArray[defaultTexture].id;
+		temp.texture[0] = textureManager->texArray.item[defaultTexture].id;
 		strcpy(temp.name, filename);
 
 		temp.calcMinMax();
@@ -1482,7 +1482,7 @@ int MeshManager::createPlane(glm::vec2 size)
 	glBufferData(GL_ELEMENT_ARRAY_BUFFER, temp.indices.size * sizeof(unsigned int), &temp.indices.item[0], GL_STATIC_DRAW);
 
 	temp.shaderIndex = defaultShader; // &shaderManager->shaderArray[defaultShader];
-	temp.texture[0] = textureManager->texArray[defaultTexture].id;
+	temp.texture[0] = textureManager->texArray.item[defaultTexture].id;
 	
 	temp.calcMinMax();
 
@@ -1780,7 +1780,7 @@ glm::vec4 MeshManager::textureValueFromUV(int id, glm::vec2 uv, int texid)
 	glActiveTexture(GL_TEXTURE16);
 	int tex = meshArray[id].texture[texid];
 
-	TextureObj texObj = textureManager->texArray[meshArray[id].texIndex[texid]];
+	TextureObj texObj = textureManager->texArray.item[meshArray[id].texIndex[texid]];
 	glm::vec2 size = texObj.size;
 
 	printf("%d .. %f %f \n", meshArray[id].texIndex[texid], size.x, size.y);
@@ -1884,7 +1884,7 @@ bool MeshManager::raycastAllMeshIgnoreStates(glm::vec3 p0, glm::vec3 p1)
 				if (raycastTriangle(startPos, endPos, raycast_vert[0], raycast_vert[1], raycast_vert[2]))
 				{	
 					//printf("%f -> ", raycastDataArray[raycastHitCount - 1].pos.y);
-					printf("%d \n", raycastHitCount);
+					//printf("%d \n", raycastHitCount);
 					raycastDataArray[raycastHitCount - 1].meshInd = id;
 					raycastDataArray[raycastHitCount - 1].pos = meshArray[id].modelMatrix * glm::vec4(raycastDataArray[raycastHitCount - 1].pos, 1);
 					raycastDataArray[raycastHitCount - 1].raylength = glm::length(raycastDataArray[raycastHitCount - 1].pos -p0);
@@ -2020,12 +2020,12 @@ bool MeshManager::spherecastAllMesh(glm::vec3 center, float radius)
 
 				if (spherecastTriangle(newcenter, radius, raycast_vert[0], raycast_vert[1], raycast_vert[2]))
 				{
-					printf("%f ->", spherecastDataArray[spherecastHitCount - 1].pos.x);
+					//printf("%f ->", spherecastDataArray[spherecastHitCount - 1].pos.x);
 					spherecastDataArray[spherecastHitCount - 1].pos = meshArray[id].modelMatrix * glm::vec4(spherecastDataArray[spherecastHitCount - 1].pos, 1);
 					spherecastDataArray[spherecastHitCount - 1].norm = glm::normalize(meshArray[id].transformMatrix * glm::vec4(spherecastDataArray[spherecastHitCount - 1].norm, 1));
 					spherecastDataArray[spherecastHitCount - 1].raylength = glm::length(spherecastDataArray[spherecastHitCount - 1].pos - center);
-					printf("%f \n", spherecastDataArray[spherecastHitCount - 1].raylength);
-					printf("%f \n", spherecastDataArray[spherecastHitCount - 1].pos.x);
+					//printf("%f \n", spherecastDataArray[spherecastHitCount - 1].raylength);
+					//printf("%f \n", spherecastDataArray[spherecastHitCount - 1].pos.x);
 				}
 			}
 		}
@@ -2287,7 +2287,7 @@ glm::vec3 MeshManager::resolveSphereSlide()
 	}
 
 
-	printf("before %f  \n", sampleSphereCenter.x);
+	//printf("before %f  \n", sampleSphereCenter.x);
 
 
 	float dist = sampleSphereRadius - spherecastDataArray[0].raylength;
@@ -2296,7 +2296,7 @@ glm::vec3 MeshManager::resolveSphereSlide()
 
 
 
-	printf("after %f  \n", sampleSphereCenter.x);
+	//printf("after %f  \n", sampleSphereCenter.x);
 	
 	return sampleSphereCenter;
 }
@@ -2367,7 +2367,7 @@ void MeshManager::setShader(unsigned int meshIndex, unsigned int shaderIndex)
 void MeshManager::setTexture(int index, int texInd, int textureSlot)
 {
 	meshArray[index].texIndex[textureSlot] = texInd;
-	meshArray[index].texture[textureSlot] = textureManager->texArray[texInd].id;
+	meshArray[index].texture[textureSlot] = textureManager->texArray.item[texInd].id;
 }
 
 void MeshManager::setPosition(int index, glm::vec3 pos)
@@ -2861,7 +2861,7 @@ void MeshManager::frustumCull(Camera cam, glm::mat4 proj, glm::vec2 res)
 	//printf("(%f, %f) , (%f, %f) -> %f\n", leftbound.x, leftbound.y, rightbound.x, rightbound.y, glm::dot(leftbound, rightbound));
 	float dotbounds = glm::dot(leftbound, rightbound);
 
-	printf("%f  \n", dotbounds);
+	//printf("%f  \n", dotbounds);
 
 	for (int n = 0; n < meshCount; n++)
 	{
@@ -2944,84 +2944,6 @@ bool is_near(float v1, float v2)
 	return fabs(v1 - v2) < 0.01f;
 }
 
-// Searches through all already-exported vertices
-// for a similar one.
-// Similar = same position + same UVs + same normal
-bool getSimilarVertexIndex(
-	glm::vec3 & in_vertex,
-	glm::vec2 & in_uv,
-	glm::vec3 & in_normal,
-	glm::vec3 & in_colors,
-	Stack<glm::vec3> & out_vertices,
-	Stack<glm::vec2> & out_uvs,
-	Stack<glm::vec3> & out_normals,
-	Stack<glm::vec3> & out_colors,
-
-	unsigned int & result
-)
-{
-	// Lame linear search
-	for (unsigned int i = 0; i<out_vertices.size; i++)
-	{
-		if (
-			is_near(in_vertex.x, out_vertices.item[i].x) &&
-			is_near(in_vertex.y, out_vertices.item[i].y) &&
-			is_near(in_vertex.z, out_vertices.item[i].z) &&
-
-			is_near(in_uv.x, out_uvs.item[i].x) &&
-			is_near(in_uv.y, out_uvs.item[i].y) &&
-
-			is_near(in_normal.x, out_normals.item[i].x) &&
-			is_near(in_normal.y, out_normals.item[i].y) &&
-			is_near(in_normal.z, out_normals.item[i].z) &&
-
-			is_near(in_colors.x, out_colors.item[i].x) &&
-			is_near(in_colors.y, out_colors.item[i].y) &&
-			is_near(in_colors.z, out_colors.item[i].z)
-			)
-		{
-			result = i;
-			return true;
-		}
-	}
-	// No other vertex could be used instead.
-	// Looks like we'll have to add it to the VBO.
-	return false;
-}
-
-void indexVBO_slow(
-	Stack<glm::vec3> & in_vertices,
-	Stack<glm::vec2> & in_uvs,
-	Stack<glm::vec3> & in_normals,
-	Stack<glm::vec3> & in_colors,
-
-	Stack<unsigned int> & out_indices,
-	Stack<glm::vec3> & out_vertices,
-	Stack<glm::vec2> & out_uvs,
-	Stack<glm::vec3> & out_normals,
-	Stack<glm::vec3> & out_colors
-)
-{
-	// For each input vertex
-	for (unsigned int i = 0; i<in_vertices.size; i++)
-	{
-
-		// Try to find a similar vertex in out_XXXX
-		unsigned int index;
-		bool found = getSimilarVertexIndex(in_vertices.item[i], in_uvs.item[i], in_normals.item[i], in_colors.item[i], out_vertices, out_uvs, out_normals, out_colors, index);
-
-		if (found)
-		{ // A similar vertex is already in the VBO, use it instead !
-			out_indices.add(index);
-		}
-		else { // If not, it needs to be added in the output data.
-			out_vertices.add(in_vertices.item[i]);
-			out_uvs.add(in_uvs.item[i]);
-			out_normals.add(in_normals.item[i]);
-			out_indices.add((unsigned int)out_vertices.size - 1);
-		}
-	}
-}
 
 
 

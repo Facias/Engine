@@ -121,7 +121,7 @@ void Editor::Init()
 	// make x axis reference
 	axis_arrow[0] = meshManager->loadMesh("axis_arrow.obj");
 	int sho = textureManager->loadImage("axis_arrowLight.png");
-	meshManager->meshArray[axis_arrow[0]].texture[0] = textureManager->texArray[sho].id;
+	meshManager->meshArray[axis_arrow[0]].texture[0] = textureManager->texArray.item[sho].id;
 	meshManager->setShaderConst(axis_arrow[0], "vcolor", 1, 0, 0, 1);
 	meshManager->meshArray[axis_arrow[0]].rot = glm::vec3(0, 90, 0);
 	meshManager->meshArray[axis_arrow[0]].pos = glm::vec3(0, 5, 0);
@@ -132,7 +132,7 @@ void Editor::Init()
 
 	// make y axis reference
 	axis_arrow[1] = meshManager->loadMesh("axis_arrow.obj");
-	meshManager->meshArray[axis_arrow[1]].texture[0] = textureManager->texArray[sho].id;
+	meshManager->meshArray[axis_arrow[1]].texture[0] = textureManager->texArray.item[sho].id;
 	meshManager->setShaderConst(axis_arrow[1], "vcolor", 0, 1, 0, 1);
 	meshManager->meshArray[axis_arrow[1]].rot = glm::vec3(-90, 0, 0);
 	meshManager->meshArray[axis_arrow[1]].pos = glm::vec3(0, 5, 0);
@@ -143,7 +143,7 @@ void Editor::Init()
 
 	// make z axis reference
 	axis_arrow[2] = meshManager->loadMesh("axis_arrow.obj");
-	meshManager->meshArray[axis_arrow[2]].texture[0] = textureManager->texArray[sho].id;
+	meshManager->meshArray[axis_arrow[2]].texture[0] = textureManager->texArray.item[sho].id;
 	meshManager->setShaderConst(axis_arrow[2], "vcolor", 0, 0, 1, 1);
 	meshManager->meshArray[axis_arrow[2]].pos = glm::vec3(0, 5, 0);
 	meshManager->meshArray[axis_arrow[2]].rot = glm::vec3(0, 0, 0);
@@ -154,7 +154,7 @@ void Editor::Init()
 
 	// make x radial axis reference
 	radial_axis[0] = meshManager->loadMesh("radial_axis.obj");
-	meshManager->meshArray[radial_axis[0]].texture[0] = textureManager->texArray[defaultTexture].id;
+	meshManager->meshArray[radial_axis[0]].texture[0] = textureManager->texArray.item[defaultTexture].id;
 	meshManager->setShaderConst(radial_axis[0], "vcolor", .8f, 0.f, 0.f, 1.f);
 	meshManager->meshArray[radial_axis[0]].type = ENGINE::EDITOR;
 	meshManager->meshArray[radial_axis[0]].updateModelMatrix();
@@ -163,7 +163,7 @@ void Editor::Init()
 
 	// make y radial axis reference
 	radial_axis[1] = meshManager->loadMesh("radial_axis.obj");
-	meshManager->meshArray[radial_axis[1]].texture[0] = textureManager->texArray[defaultTexture].id;
+	meshManager->meshArray[radial_axis[1]].texture[0] = textureManager->texArray.item[defaultTexture].id;
 	meshManager->setShaderConst(radial_axis[1], "vcolor", 0.f, .8f, 0.f, 1.f);
 	meshManager->meshArray[radial_axis[1]].rot = glm::vec3(0, 0, 90);
 	meshManager->meshArray[radial_axis[1]].type = ENGINE::EDITOR;
@@ -173,7 +173,7 @@ void Editor::Init()
 
 	// make z radial axis reference
 	radial_axis[2] = meshManager->loadMesh("radial_axis.obj");
-	meshManager->meshArray[radial_axis[2]].texture[0] = textureManager->texArray[defaultTexture].id;
+	meshManager->meshArray[radial_axis[2]].texture[0] = textureManager->texArray.item[defaultTexture].id;
 	meshManager->setShaderConst(radial_axis[2], "vcolor", 0.f, 0.f, .8f, 1.f);
 	meshManager->meshArray[radial_axis[2]].rot = glm::vec3(0, 90, 0);
 	meshManager->meshArray[radial_axis[2]].type = ENGINE::EDITOR;

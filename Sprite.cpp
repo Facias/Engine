@@ -11,7 +11,7 @@ int SpriteManager::createSprite(glm::vec2 sz)
 	temp.shader = &shaderManager->shaderArray[defaultSpriteShaderID];
 	temp.shaderIndex = defaultSpriteShaderID;
 	temp.texIndex[0] = textureManager->blank;
-	temp.texture[0] = textureManager->texArray[temp.texIndex[0]].id;
+	temp.texture[0] = textureManager->texArray.item[temp.texIndex[0]].id;
 
 	temp.setShaderConst("vcolor", 1, 1, 1, 1);
 
@@ -24,7 +24,7 @@ int SpriteManager::createSprite(glm::vec2 sz)
 	glBindBuffer(GL_ARRAY_BUFFER, temp.vertBufferID);
 	glBufferData(GL_ARRAY_BUFFER, 6 * sizeof(glm::vec2), &vert[0], GL_STATIC_DRAW);
 
-	int n = add(temp);
+	int n = spriteArray.add(temp);
 	setScissor(n, glm::vec2(0), glm::vec2(0));
 	setFeather(n, 0.0f);
 	setColor(n, glm::vec4(1));
@@ -32,30 +32,6 @@ int SpriteManager::createSprite(glm::vec2 sz)
 	return n;
 }
 
-// Add sprite to manager array
-int SpriteManager::add(Sprite item)
-{
-	if (spriteCount + 2 > arraySize)
-	{
-		Sprite *temp;
-		temp = new Sprite[arraySize * 2];
-
-		for (int n = 0; n < spriteCount; n++)
-			temp[n] = spriteArray[n];
-
-		spriteArray = temp;
-		arraySize *= 2;
-
-		sortingArray = new Sprite*[arraySize];
-
-		for (int n = 0; n < spriteCount; n++)
-			sortingArray[n] = &spriteArray[n];
-	}
-
-	spriteArray[spriteCount++] = item;
-	sortingArray[spriteCount-1] = &item;
-	return spriteCount - 1;
-}
 
 void Sprite::updateShaderUniforms()
 {
@@ -140,132 +116,132 @@ void Sprite::setShaderConst(char *name, float v0, float v1, float v2, float v3)
 
 void SpriteManager::setPosition(int index, glm::vec2 pos)
 {
-	glm::vec2 offset = (spriteArray[index].size * spriteArray[index].scale) / 2.0f ;
-	spriteArray[index].setShaderConst("position", pos.x + offset.x, pos.y + offset.y, 0, 0);
-	spriteArray[index].pos = pos;
+	glm::vec2 offset = (spriteArray.item[index].size * spriteArray.item[index].scale) / 2.0f ;
+	spriteArray.item[index].setShaderConst("position", pos.x + offset.x, pos.y + offset.y, 0, 0);
+	spriteArray.item[index].pos = pos;
 
 }
 
 void SpriteManager::setPositionByCenter(int index, glm::vec2 pos)
 {
-	spriteArray[index].setShaderConst("position", pos.x , pos.y , 0, 0);
-	spriteArray[index].pos = pos;
+	spriteArray.item[index].setShaderConst("position", pos.x , pos.y , 0, 0);
+	spriteArray.item[index].pos = pos;
 
 }
 
 void SpriteManager::setColor(int index, glm::vec4 col)
 {
-	spriteArray[index].setShaderConst("vcolor", col.r, col.g, col.b, col.a);
-	spriteArray[index].color = col;
+	spriteArray.item[index].setShaderConst("vcolor", col.r, col.g, col.b, col.a);
+	spriteArray.item[index].color = col;
 
 }
 
 void SpriteManager::setScissor(int index, glm::vec2 p0, glm::vec2 p1)
 {
-	spriteArray[index].setShaderConst("scissor", p0.x, p0.y, p1.x, p1.y);
+	spriteArray.item[index].setShaderConst("scissor", p0.x, p0.y, p1.x, p1.y);
 }
 
 void SpriteManager::setFeather(int index, float feather)
 {
-	spriteArray[index].setShaderConst("feather", feather,0,0,0);
+	spriteArray.item[index].setShaderConst("feather", feather,0,0,0);
 }
 
 // set the texture array index value and the texture id directly
 void SpriteManager::setTexture(int index, int texArrayInd, int texSlot)
 {
-	spriteArray[index].texIndex[texSlot] = texArrayInd;
-	spriteArray[index].texture[texSlot] = textureManager->texArray[texArrayInd].id;
+	spriteArray.item[index].texIndex[texSlot] = texArrayInd;
+	spriteArray.item[index].texture[texSlot] = textureManager->texArray.item[texArrayInd].id;
 }
 
 void SpriteManager::setVisible(int index, bool state)
 {
-	spriteArray[index].visible = state;
+	spriteArray.item[index].visible = state;
 }
 
 void SpriteManager::setAngle(int index, float angle)
 {
-	spriteArray[index].angle = angle;
+	spriteArray.item[index].angle = angle;
 
 	return;
 }
 
 void SpriteManager::setDepth(int index, float depth)
 {
-	spriteArray[index].depth = depth;
+	spriteArray.item[index].depth = depth;
 
 	return;
 }
 
 void SpriteManager::setType(int index, char tp)
 {
-	spriteArray[index].type = tp;
+	spriteArray.item[index].type = tp;
 	
 	return;
 }
 
 void SpriteManager::setSize(int index, glm::vec2 sz)
 {
-	spriteArray[index].size = sz;
-	spriteArray[index].setShaderConst("size", sz.x, sz.y, 0, 0);
+	spriteArray.item[index].size = sz;
+	spriteArray.item[index].setShaderConst("size", sz.x, sz.y, 0, 0);
 	return;
 }
 
 glm::vec2 SpriteManager::getPositionByCenter(int index)
 {
-	return spriteArray[index].pos;
+	return spriteArray.item[index].pos;
 }
 
 glm::vec2 SpriteManager::getPosition(int index)
 {
-	return spriteArray[index].pos;
+	return spriteArray.item[index].pos;
 }
 
 glm::vec4 SpriteManager::getColor(int index)
 {
-	return spriteArray[index].color;
+	return spriteArray.item[index].color;
 }
 
 int SpriteManager::getTexture(int index, int texIndex)
 {
 
-	return spriteArray[index].texture[texIndex];
+	return spriteArray.item[index].texture[texIndex];
 }
 
 bool SpriteManager::getVisible(int index)
 {
-	return spriteArray[index].visible;
+	return spriteArray.item[index].visible;
 }
 
 float SpriteManager::getDepth(int index)
 {
-	return spriteArray[index].depth;
+	return spriteArray.item[index].depth;
 }
 
 float SpriteManager::getAngle(int index)
 {
-	return spriteArray[index].angle;
+	return spriteArray.item[index].angle;
 }
 
 glm::vec2 SpriteManager::getSize(int index)
 {
-	return spriteArray[index].size;
+	return spriteArray.item[index].size;
 }
 
 char SpriteManager::getType(int index)
 {
-	return spriteArray[index].type;
+	return spriteArray.item[index].type;
 }
 
 void SpriteManager::sort()
 {
 
-	if (sortingCount != spriteCount)
+	if (sortingCount != spriteArray.size)
 	{
-		for (int n = 0; n < spriteCount; n++)
+		for (int n = 0; n < spriteArray.size; n++)
 		{
-			sortingArray[n] = &spriteArray[n];
+			sortingArray[n] = &spriteArray.item[n];
 		}
-		sortingCount = spriteCount;
+		sortingCount = spriteArray.size;
 	}
 	recQuickSort(0, sortingCount - 1);
 }

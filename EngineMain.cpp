@@ -15,23 +15,21 @@
 #include "Text.h"
 #include "Shader.h"
 
-
-
 #undef max
 #undef min
 
 using namespace ENGINE;
 
 
-
 void Engine::init()
 {
 	wglSwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC)wglGetProcAddress("wglSwapIntervalEXT");
-	setVSync(0);
+	setVSync(1);
 
 	sorting2DArray = new SortItem2D[8];
 
-	sunpos = glm::vec3(-100000.f, -20000.f, 0.f);
+	//sunpos = glm::vec3(-100000.f, -20000.f, 0.f);
+	sunpos = glm::vec3(-5000, -7100, 2000);
 	sundir = glm::normalize(sunpos);
 
 
@@ -62,7 +60,6 @@ void Engine::init()
 
 	for (int n = 0; n < 16; n++)
 		textureStateID[n] = -2;
-
 
 	meshManager.shaderManager = &shaderManager; //do this before assigning any shaders to mesh
 	meshManager.textureManager = &textureManager;
@@ -105,7 +102,7 @@ void Engine::init()
 
 	spriteManager.defaultSpriteShaderID = defaultSpriteShader;
 	
-	
+	shadowMap.init(&textureManager);
 
 	res = glm::vec2(WIDTH, HEIGHT);
 	spriteManager.res = res;
@@ -150,47 +147,31 @@ void Engine::init()
 
 	reflectionImg = textureManager.createRenderTexture(res.x*1.f, res.y*1.f, false);
 
-	// shadows
-	shadowmapRes = 1024;
-	shadowMap[0] = textureManager.createRenderTexture(shadowmapRes, shadowmapRes, false);
-	shadowMap[1] = textureManager.createRenderTexture(shadowmapRes, shadowmapRes, false);
-	shadowMap[2] = textureManager.createRenderTexture(shadowmapRes, shadowmapRes, false);
-	shadowMap[3] = textureManager.createRenderTexture(shadowmapRes, shadowmapRes, false);
-	shadowMapComp = textureManager.createRenderTexture(shadowmapRes*4, shadowmapRes, false);
 
 
-	glBindTexture(GL_TEXTURE_2D, shadowMapComp.colorID);
-	glGenerateMipmap(GL_TEXTURE_2D);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, GLint(0));
-
-	glBindTexture(GL_TEXTURE_2D, shadowMapComp.depthID);
-	glGenerateMipmap(GL_TEXTURE_2D);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, GLint(0));
+	
 	
 
 	// GI shadows
 	GI_shadowmapRes = 256;
-	GI_shadowMap[0] = textureManager.createRenderTexture(shadowmapRes, shadowmapRes, false);
-	GI_shadowMap[1] = textureManager.createRenderTexture(shadowmapRes, shadowmapRes, false);
-	GI_shadowMap[2] = textureManager.createRenderTexture(shadowmapRes, shadowmapRes, false);
-	GI_shadowMap[3] = textureManager.createRenderTexture(shadowmapRes, shadowmapRes, false);
-	GI_shadowMapComp = textureManager.createRenderTexture(shadowmapRes * 4, shadowmapRes, false);
+	GI_shadowMap[0] = textureManager.createRenderTexture(GI_shadowmapRes, GI_shadowmapRes, false);
+	GI_shadowMap[1] = textureManager.createRenderTexture(GI_shadowmapRes, GI_shadowmapRes, false);
+	GI_shadowMap[2] = textureManager.createRenderTexture(GI_shadowmapRes, GI_shadowmapRes, false);
+	GI_shadowMap[3] = textureManager.createRenderTexture(GI_shadowmapRes, GI_shadowmapRes, false);
+	GI_shadowMapComp = textureManager.createRenderTexture(GI_shadowmapRes * 4, GI_shadowmapRes, false);
 
 
-	glBindTexture(GL_TEXTURE_2D, shadowMapComp.colorID);
+	glBindTexture(GL_TEXTURE_2D, GI_shadowMapComp.colorID);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
 
-	glBindTexture(GL_TEXTURE_2D, shadowMapComp.depthID);
+	glBindTexture(GL_TEXTURE_2D, GI_shadowMapComp.depthID);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
 
 
-	sceneScript.parseFile("scene.ss");
+	if (STARTAREA == "island") sceneScript.parseFile("Scenes/island.ss");
+	if (STARTAREA == "town") sceneScript.parseFile("Scenes/town.ss");
 	
 	int vv;
 	for (uint i = 0; i < 5; i++)
@@ -205,7 +186,7 @@ void Engine::init()
 		meshManager.setShaderConst(vv, "tile", 0, 0, 0, 0);
 		meshManager.setShaderConst(vv, "vcolor", 1.0f, 1.0f, 1.0f, 1.0f);
 		meshManager.setShaderConst(vv, "GI", 0, 0, 0, 0);
-		meshManager.setTexture(vv, shadowMapComp.depth, 15);
+		meshManager.setTexture(vv, shadowMap.compMap.depth, 15);
 	}
 
 	textManager.init();
@@ -256,14 +237,14 @@ void Engine::init()
 
 	// compiled shadow map
 	shadowCompQuad = meshManager.createQuad();
-	meshManager.setTexture(shadowCompQuad, shadowMap[0].depth, 0);
-	meshManager.setTexture(shadowCompQuad, shadowMap[1].depth, 1);
-	meshManager.setTexture(shadowCompQuad, shadowMap[2].depth, 2);
-	meshManager.setTexture(shadowCompQuad, shadowMap[3].depth, 3);
-	meshManager.setTexture(shadowCompQuad, shadowMap[0].color, 4);
-	meshManager.setTexture(shadowCompQuad, shadowMap[1].color, 5);
-	meshManager.setTexture(shadowCompQuad, shadowMap[2].color, 6);
-	meshManager.setTexture(shadowCompQuad, shadowMap[3].color, 7);
+	meshManager.setTexture(shadowCompQuad, shadowMap.map[0].depth, 0);
+	meshManager.setTexture(shadowCompQuad, shadowMap.map[1].depth, 1);
+	meshManager.setTexture(shadowCompQuad, shadowMap.map[2].depth, 2);
+	meshManager.setTexture(shadowCompQuad, shadowMap.map[3].depth, 3);
+	meshManager.setTexture(shadowCompQuad, shadowMap.map[0].color, 4);
+	meshManager.setTexture(shadowCompQuad, shadowMap.map[1].color, 5);
+	meshManager.setTexture(shadowCompQuad, shadowMap.map[2].color, 6);
+	meshManager.setTexture(shadowCompQuad, shadowMap.map[3].color, 7);
 	meshManager.setShader(shadowCompQuad, shadowCompShader);
 
 	// GI compiled shadow map
@@ -299,7 +280,7 @@ void Engine::init()
 	int grass = textureManager.loadImage("sparkle.DDS");
 
 	
-	particles.texture[0] = textureManager.texArray[grass].id;
+	particles.texture[0] = textureManager.texArray.item[grass].id;
 
 	frameTime = 0.0;
 	time = 0.0;
@@ -319,12 +300,6 @@ void Engine::init()
 	meshManager.setShader(renderQuad, defaultQuadShader);
 	meshManager.setTexture(renderQuad, lightShaftBuffer[1].color, 3);
 
-	
-	//GLuint quad_VertexArrayID;
-	//glGenVertexArrays(1, &quad_VertexArrayID);
-	//glBindVertexArray(quad_VertexArrayID);
-
-	
 
 	control.position = glm::vec3(0, 4, -4);
 
@@ -345,7 +320,7 @@ void Engine::init()
 	editor.meshManager = &meshManager;
 	editor.shaderManager = &shaderManager;
 	editor.textureManager = &textureManager;
-	editor.shadowmapcomp_depth = shadowMapComp.depth;
+	editor.shadowmapcomp_depth = shadowMap.compMap.depth;
 	editor.windowSize = windowSize;
 	editor.mainCamera = &mainCamera;
 	editor.control = &control;
@@ -367,8 +342,8 @@ void Engine::init()
 	setMultisampleLevel(8);
 
 
-	//meshManager.createLine3(glm::vec3(0), glm::vec3(500,200,000), .1f);
-	//meshManager.createLine3(glm::vec3(0,0,10), glm::vec3(500, 200, 000), .1f);
+	meshManager.createLine3(glm::vec3(0), glm::vec3(500,200,000), .1f);
+	meshManager.createLine3(glm::vec3(0,0,10), glm::vec3(500, 200, 000), .1f);
 
 	//projectionMatrix = glm::perspective(glm::radians(control.activeCamera.FOV), 16.0f / 9.0f, 0.1f, 1000.0f);
 	mainCamera.projMatrix = glm::perspective(glm::radians(control.activeCamera.FOV), 16.0f / 9.0f, 0.1f, 2500.0f);
@@ -379,6 +354,7 @@ void Engine::init()
 	SYSTEM_INFO sysinfo;
 	GetSystemInfo(&sysinfo);
 	processorCount = (char)sysinfo.dwNumberOfProcessors;
+	printf("processor count: %d/n", processorCount);
 
 	workingThread = new Thread[processorCount];
 	//setResolution(640, 480);
@@ -389,6 +365,10 @@ void Engine::init()
 
 void Engine::mainLoop(void)
 {
+	//updateFrameTimeInfo();
+	time += float(60.0 / glm::max(1.0, getFrameRate()));
+	if (frameTime > 1.0/30.0) printf("%f\n", frameTime);
+
 	editor.editorMode = control.editorMode;
 	meshManager.setShaderConst(renderQuad,"time", time, 0.f, 0.f, 0.f);
 	
@@ -423,8 +403,7 @@ void Engine::mainLoop(void)
 		mainCamera.projMatrix = glm::perspective( glm::radians(control.activeCamera.FOV), 16.0f/9.0f, 0.1f, 2500.0f);
 	}
 
-	updateFrameTimeInfo();
-	time += float(60.0 / glm::max(1.0, getFrameRate()));	
+	
 
 	
 	control.frameRate = getFrameRate();
@@ -610,15 +589,10 @@ void Engine::mainLoop(void)
 		control.resetMouseInput();
 	}
 
-	/*
-	GLboolean smooth;
-	
-	glGetBooleanv(GL_POLYGON_SMOOTH, &smooth);
-	printf("%d \n", smooth);
-	*/
+
 
 	frustumCull(mainCamera);
-
+	
 	render();
 
 }
@@ -626,7 +600,7 @@ void Engine::mainLoop(void)
 void Engine::render(void)
 {
 
-	generateShadowMap();
+	generateShadowMap(shadowMap);
 
 	//render opaque geometry
 	if (samples > 0)
@@ -646,6 +620,7 @@ void Engine::render(void)
 	
 	
 	// draw opaque geometry
+	
 	for (int n = 0; n < meshManager.meshCount; n++)
 	{
 		if (meshManager.meshArray[n].type == STANDARD)
@@ -658,11 +633,11 @@ void Engine::render(void)
 					{
 						meshManager.setShaderConst(n, "campos", mainCamera.pos.x, mainCamera.pos.y, mainCamera.pos.z, 0.f);
 						meshManager.setShaderConst(n, "time", (float)time, 0.f, 0.f, 0.f);
-						meshManager.setShaderConst(n, "shadowMapSize", shadowmapRes, 0, 0, 0);
-						meshManager.setShaderConst(n, "cascadeCenter0", cascadeCenter[0].x, cascadeCenter[0].y, cascadeCenter[0].z, 0.f);
-						meshManager.setShaderConst(n, "cascadeCenter1", cascadeCenter[1].x, cascadeCenter[1].y, cascadeCenter[1].z, 0.f);
-						meshManager.setShaderConst(n, "cascadeCenter2", cascadeCenter[2].x, cascadeCenter[2].y, cascadeCenter[2].z, 0.f);
-						meshManager.setShaderConst(n, "cascadeCenter3", cascadeCenter[3].x, cascadeCenter[3].y, cascadeCenter[3].z, 0.f);
+						meshManager.setShaderConst(n, "shadowMapSize", shadowMap.res, 0, 0, 0);
+						meshManager.setShaderConst(n, "cascadeCenter0", shadowMap.cascadeCenter[0].x, shadowMap.cascadeCenter[0].y, shadowMap.cascadeCenter[0].z, 0.f);
+						meshManager.setShaderConst(n, "cascadeCenter1", shadowMap.cascadeCenter[1].x, shadowMap.cascadeCenter[1].y, shadowMap.cascadeCenter[1].z, 0.f);
+						meshManager.setShaderConst(n, "cascadeCenter2", shadowMap.cascadeCenter[2].x, shadowMap.cascadeCenter[2].y, shadowMap.cascadeCenter[2].z, 0.f);
+						meshManager.setShaderConst(n, "cascadeCenter3", shadowMap.cascadeCenter[3].x, shadowMap.cascadeCenter[3].y, shadowMap.cascadeCenter[3].z, 0.f);
 						drawMesh(&meshManager.meshArray[n]);
 					}
 				}
@@ -670,8 +645,9 @@ void Engine::render(void)
 		}
 	}
 	
-	//if (samples > 0)
-	//	glDisable(GL_SAMPLE_ALPHA_TO_ONE);
+
+	if (samples > 0)
+		glDisable(GL_SAMPLE_ALPHA_TO_ONE);
 	
 	// render reflection image
 	
@@ -751,6 +727,7 @@ void Engine::render(void)
 		// antialias reflections
 		antialiasBuffer(reflectionImg);
 	}// done reflecting
+	
 
 	view_projMatrix = mainCamera.view_projMatrix;
 
@@ -770,6 +747,7 @@ void Engine::render(void)
 	
 	
 	// render water
+	
 	glDepthMask(false);
 	for (uint n = 0; n < meshManager.meshCount; n++)
 	{
@@ -781,18 +759,20 @@ void Engine::render(void)
 				meshManager.setShaderConst(n, "time", (float)time, 0.f, 0.f, 0.f);
 				meshManager.setShaderConst(n, "campos", mainCamera.pos.x, mainCamera.pos.y, mainCamera.pos.z, 0.f);
 				meshManager.setShaderConst(n, "resolution", res.x, res.y, 0, 0);
-				meshManager.setShaderConst(n, "shadowMapSize", shadowmapRes, 0, 0, 0);
-				meshManager.setShaderConst(n, "cascadeCenter0", cascadeCenter[0].x, cascadeCenter[0].y, cascadeCenter[0].z, 0.f);
-				meshManager.setShaderConst(n, "cascadeCenter1", cascadeCenter[1].x, cascadeCenter[1].y, cascadeCenter[1].z, 0.f);
-				meshManager.setShaderConst(n, "cascadeCenter2", cascadeCenter[2].x, cascadeCenter[2].y, cascadeCenter[2].z, 0.f);
-				meshManager.setShaderConst(n, "cascadeCenter3", cascadeCenter[3].x, cascadeCenter[3].y, cascadeCenter[3].z, 0.f);
+				meshManager.setShaderConst(n, "shadowMapSize", shadowMap.res, 0, 0, 0);
+				meshManager.setShaderConst(n, "cascadeCenter0", shadowMap.cascadeCenter[0].x, shadowMap.cascadeCenter[0].y, shadowMap.cascadeCenter[0].z, 0.f);
+				meshManager.setShaderConst(n, "cascadeCenter1", shadowMap.cascadeCenter[1].x, shadowMap.cascadeCenter[1].y, shadowMap.cascadeCenter[1].z, 0.f);
+				meshManager.setShaderConst(n, "cascadeCenter2", shadowMap.cascadeCenter[2].x, shadowMap.cascadeCenter[2].y, shadowMap.cascadeCenter[2].z, 0.f);
+				meshManager.setShaderConst(n, "cascadeCenter3", shadowMap.cascadeCenter[3].x, shadowMap.cascadeCenter[3].y, shadowMap.cascadeCenter[3].z, 0.f);
 				drawMesh(&meshManager.meshArray[n]);
 			}
 		}
 	}
 	glDepthMask(true);
 	
+
 	// draw alpha-blended geometry
+	
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glDepthMask(false);
@@ -803,23 +783,23 @@ void Engine::render(void)
 			if (meshManager.meshArray[n].transparent)
 			{
 				meshManager.setShaderConst(n, "campos", mainCamera.pos.x, mainCamera.pos.y, mainCamera.pos.z, 0.f);
-				meshManager.setShaderConst(n, "cascadeCenter0", cascadeCenter[0].x, cascadeCenter[0].y, cascadeCenter[0].z, 0.f);
-				meshManager.setShaderConst(n, "cascadeCenter1", cascadeCenter[1].x, cascadeCenter[1].y, cascadeCenter[1].z, 0.f);
-				meshManager.setShaderConst(n, "cascadeCenter3", cascadeCenter[3].x, cascadeCenter[3].y, cascadeCenter[3].z, 0.f);
-				meshManager.setShaderConst(n, "cascadeCenter2", cascadeCenter[2].x, cascadeCenter[2].y, cascadeCenter[2].z, 0.f);
+				meshManager.setShaderConst(n, "cascadeCenter0", shadowMap.cascadeCenter[0].x, shadowMap.cascadeCenter[0].y, shadowMap.cascadeCenter[0].z, 0.f);
+				meshManager.setShaderConst(n, "cascadeCenter1", shadowMap.cascadeCenter[1].x, shadowMap.cascadeCenter[1].y, shadowMap.cascadeCenter[1].z, 0.f);
+				meshManager.setShaderConst(n, "cascadeCenter3", shadowMap.cascadeCenter[3].x, shadowMap.cascadeCenter[3].y, shadowMap.cascadeCenter[3].z, 0.f);
+				meshManager.setShaderConst(n, "cascadeCenter2", shadowMap.cascadeCenter[2].x, shadowMap.cascadeCenter[2].y, shadowMap.cascadeCenter[2].z, 0.f);
 				drawMesh(&meshManager.meshArray[n]);
 			}
 		}
 	}
-
+	
 	drawParticle(&particles);
 	
 	
 	glDepthMask(true);
 	if (samples > 1)
 	{
-		//glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-		//glEnable(GL_SAMPLE_ALPHA_TO_ONE);
+		glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
+		glEnable(GL_SAMPLE_ALPHA_TO_ONE);
 	}
 	glDisable(GL_BLEND);
 
@@ -862,6 +842,7 @@ void Engine::render(void)
 	setRenderToTexture(lightShaftBuffer[0], 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	
+	
 	glm::vec2 sunpos2d = pointToScreenPos(-sunpos);
 	float looksun = glm::dot(mainCamera.forward, glm::normalize(-mainCamera.pos - sunpos));
 	
@@ -902,8 +883,6 @@ void Engine::render(void)
 
 	}
 	
-	
-
 	// update light sample of currentview;
 	if (++apertureAdjustTimer > 3)
 	{
@@ -912,6 +891,7 @@ void Engine::render(void)
 	}
 	
 	// create bloom effect
+	
 	extractHighlights(renderImg[0].color);
 	blurBuffer(bloomBuffer[1].color, bloomBuffer[1], 10, 4.0f);
 	
@@ -923,22 +903,24 @@ void Engine::render(void)
 	glClear(GL_DEPTH_BUFFER_BIT);
 	glDepthFunc(GL_LESS);
 
+	/*
 	for (int n = 0; n < meshManager.meshCount; n++)
 	{
 		if (meshManager.meshArray[n].type == EDITOR)
 		{
 			drawMesh(&meshManager.meshArray[n]);
 		}
-	}
+	}*/
 
 	// render Text
 	char text[256];
 	sprintf_s(text, "%.04f", getFrameRate());
 	textManager.textArray[editor.fpsText].pos = glm::vec2(10, windowSize.y - 36);
 	textManager.setString(editor.fpsText, text);
-
+	
 	
 	// draw 2d items (sprite & text) in order of depth - far to near
+	
 	glEnable(GL_BLEND);
 	if (samples > 0)
 	{
@@ -948,14 +930,16 @@ void Engine::render(void)
 	glDepthFunc(GL_ALWAYS);
 	glDisable(GL_CULL_FACE);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	sort2DItems();
+	drawText(editor.fpsText);
+	//sort2DItems();
+	
 	for (int n = 0; n < sorting2DCount; n++)
 	{
 		if (sorting2DArray[n].type == SortItem2D::SPRITE)
 		{
 			if (spriteManager.getVisible(sorting2DArray[n].arrayIndex))
 			{
-				if (spriteManager.getType(sorting2DArray[n].arrayIndex) != spriteManager.EDITOR) drawSprite(&spriteManager.spriteArray[sorting2DArray[n].arrayIndex]);
+				if (spriteManager.getType(sorting2DArray[n].arrayIndex) != spriteManager.EDITOR) drawSprite(&spriteManager.spriteArray.item[sorting2DArray[n].arrayIndex]);
 			}
 		}
 		if (sorting2DArray[n].type == SortItem2D::TEXT)
@@ -966,7 +950,7 @@ void Engine::render(void)
 			}
 		}
 	}
-
+	
 	// draw editor entities
 	if (editor.editorMode)
 	{
@@ -974,7 +958,7 @@ void Engine::render(void)
 		{
 			DrawRequest a = editor.drawReqStack.pop();
 			if (a.type == editor.EDITOR_SPRITE)
-				drawSprite(&spriteManager.spriteArray[a.index]);
+				drawSprite(&spriteManager.spriteArray.item[a.index]);
 			if (a.type == editor.EDITOR_TEXT)
 				drawText(a.index);
 			if (a.type == editor.EDITOR_GEOMETRY)
@@ -1038,14 +1022,15 @@ void Engine::drawMesh(MeshObj *current)
 		current->setShaderMat(shaderState, "model", current->modelMatrix);
 
 		//do this if mesh receives shadows 
-		mvp_shadow = shadowViewProj[0] * *currentModel;
-		current->setShaderMat(shaderState, "MVP_shadow0", mvp_shadow);
-		mvp_shadow = shadowViewProj[1] * *currentModel;
-		current->setShaderMat(shaderState, "MVP_shadow1", mvp_shadow);
-		mvp_shadow = shadowViewProj[2] * *currentModel;
-		current->setShaderMat(shaderState, "MVP_shadow2", mvp_shadow);
-		mvp_shadow = shadowViewProj[3] * *currentModel;
-		current->setShaderMat(shaderState, "MVP_shadow3", mvp_shadow);
+		
+		shadowMap.mvp_shadow = shadowMap.viewProj[0] * *currentModel;
+		current->setShaderMat(shaderState, "MVP_shadow0", shadowMap.mvp_shadow);
+		shadowMap.mvp_shadow = shadowMap.viewProj[1] * *currentModel;
+		current->setShaderMat(shaderState, "MVP_shadow1", shadowMap.mvp_shadow);
+		shadowMap.mvp_shadow = shadowMap.viewProj[2] * *currentModel;
+		current->setShaderMat(shaderState, "MVP_shadow2", shadowMap.mvp_shadow);
+		shadowMap.mvp_shadow = shadowMap.viewProj[3] * *currentModel;
+		current->setShaderMat(shaderState, "MVP_shadow3", shadowMap.mvp_shadow);
 
 		current->updateShaderUniforms(shaderState);
 		// set all shader constants for this mesh
@@ -1335,7 +1320,7 @@ void Engine::drawMesh(MeshObj *current)
 
 void Engine::drawMeshGI(MeshObj *current)
 {
-
+	/*
 	if (current->visible)
 	{
 		glDisable(GL_CULL_FACE);
@@ -1355,13 +1340,13 @@ void Engine::drawMeshGI(MeshObj *current)
 		current->setShaderMat(shaderState, "model", current->modelMatrix);
 
 		//do this if mesh receives shadows 
-		mvp_shadow = shadowViewProj[0] * *currentModel;
+		mvp_shadowGI = shadowViewProj[0] * *currentModel;
 		current->setShaderMat(shaderState, "MVP_shadow0", mvp_shadow);
-		mvp_shadow = shadowViewProj[1] * *currentModel;
+		mvp_shadowGI = shadowViewProj[1] * *currentModel;
 		current->setShaderMat(shaderState, "MVP_shadow1", mvp_shadow);
-		mvp_shadow = shadowViewProj[2] * *currentModel;
+		mvp_shadowGI = shadowViewProj[2] * *currentModel;
 		current->setShaderMat(shaderState, "MVP_shadow2", mvp_shadow);
-		mvp_shadow = shadowViewProj[3] * *currentModel;
+		mvp_shadowGI = shadowViewProj[3] * *currentModel;
 		current->setShaderMat(shaderState, "MVP_shadow3", mvp_shadow);
 
 		current->updateShaderUniforms(shaderState);
@@ -1639,7 +1624,7 @@ void Engine::drawMeshGI(MeshObj *current)
 
 			glDisableVertexAttribArray(0);
 		}
-	}
+	}*/
 }
 
 void Engine::drawParticle(ParticleSet *current)
@@ -1756,7 +1741,7 @@ void Engine::drawMeshShadowMap(MeshObj *current, int cascade)
 		}
 
 		currentModel = &current->modelMatrix;
-		mvp = shadowViewProj[cascade] * *currentModel;
+		mvp = shadowMap.viewProj[cascade] * *currentModel;
 
 
 		current->setShaderMat(shaderState, "MVP", mvp);
@@ -2033,7 +2018,6 @@ void Engine::drawText(int index)
 		textManager.uv_up_right = glm::vec2(pos.x + csize.x, pos.y + csize.y) / float(fontImgSize.x);
 		textManager.uv_down_right = glm::vec2(pos.x + csize.x, pos.y) / float(fontImgSize.y);
 		textManager.uv_down_left = glm::vec2(pos.x, pos.y) / float(fontImgSize.y);
-
 
 		textManager.UVs[i * 6] = textManager.uv_up_left;
 		textManager.UVs[i * 6 + 1] = textManager.uv_down_left;
@@ -2630,39 +2614,39 @@ void Engine::buildSceneEntity(int index)
 			{
 				int exists = -1;
 				// determine if texture already exists
-				for (int t = 0; t < textureManager.texCount; t++)
+				for (int t = 0; t < textureManager.texArray.size; t++)
 				{
-					if (strcmp(textureManager.texArray[t].name, sceneScript.entityArray[index].texName[n]) == 0)
+					if (strcmp(textureManager.texArray.item[t].name, sceneScript.entityArray[index].texName[n]) == 0)
 						exists = t;
 				}
 
 				if (exists == -1)
 				{
-					printf("loading %s \n", sceneScript.entityArray[index].texName[n]);
+					//printf("loading %s \n", sceneScript.entityArray[index].texName[n]);
 					int a = textureManager.loadImage(sceneScript.entityArray[index].texName[n]);
 
 					if (!sceneScript.entityArray[index].texWrap[n])
 					{
 						glTextureParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
 						glTextureParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
-						textureManager.texArray[a].wrapU = false;
-						textureManager.texArray[a].wrapV = false;
+						textureManager.texArray.item[a].wrapU = false;
+						textureManager.texArray.item[a].wrapV = false;
 					}
 					else
 					{
 						glTextureParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 						glTextureParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-						textureManager.texArray[a].wrapU = true;
-						textureManager.texArray[a].wrapV = true;
+						textureManager.texArray.item[a].wrapU = true;
+						textureManager.texArray.item[a].wrapV = true;
 					}
 
-					meshManager.meshArray[meshInd].texture[n] = textureManager.texArray[a].id;
+					meshManager.meshArray[meshInd].texture[n] = textureManager.texArray.item[a].id;
 					meshManager.meshArray[meshInd].texIndex[n] = a;
 				}
 				else
 				{
 					// if texture already exists, assign that to the mesh
-					meshManager.meshArray[meshInd].texture[n] = textureManager.texArray[exists].id;
+					meshManager.meshArray[meshInd].texture[n] = textureManager.texArray.item[exists].id;
 					meshManager.meshArray[meshInd].texIndex[n] = exists;
 					//meshManager.setTexture(meshInd, exists, n);
 				}
@@ -2717,8 +2701,8 @@ void Engine::buildSceneEntity(int index)
 			meshManager.setShaderConst(meshInd, "GI", 0, 0, 0, 0);
 
 		// assign shadow map
-		meshManager.setTexture(meshInd, shadowMapComp.depth, 15);
-		meshManager.setTexture(meshInd, shadowMapComp.color, 14);
+		meshManager.setTexture(meshInd, shadowMap.compMap.depth, 15);
+		meshManager.setTexture(meshInd, shadowMap.compMap.color, 14);
 
 		// assign depth map
 		if (sceneScript.entityArray[index].depthMap)
@@ -2827,24 +2811,24 @@ glm::vec3 Engine::raycastPlane(glm::vec3 p0, glm::vec3 p1, glm::vec3 norm, glm::
 void Engine::sort2DItems()
 {
 
-	if (sorting2DCount != spriteManager.spriteCount + textManager.textCount)
+	if (sorting2DCount != spriteManager.spriteArray.size + textManager.textCount)
 	{
 		delete[] sorting2DArray;
-		sorting2DArray = new SortItem2D[spriteManager.spriteCount + textManager.textCount + 2];
+		sorting2DArray = new SortItem2D[spriteManager.spriteArray.size + textManager.textCount + 2];
 
-		for (int n = 0; n < spriteManager.spriteCount; n++)
+		for (int n = 0; n < spriteManager.spriteArray.size; n++)
 		{
 			sorting2DArray[n].arrayIndex = n;
-			sorting2DArray[n].depth = spriteManager.spriteArray[n].depth;
+			sorting2DArray[n].depth = spriteManager.spriteArray.item[n].depth;
 			sorting2DArray[n].type = SortItem2D::SPRITE;
 		}
 		for (int n = 0; n < textManager.textCount ; n++)
 		{
-			sorting2DArray[n + spriteManager.spriteCount].arrayIndex = n;
-			sorting2DArray[n + spriteManager.spriteCount].depth = textManager.textArray[n].depth;
-			sorting2DArray[n + spriteManager.spriteCount].type = SortItem2D::TEXT;
+			sorting2DArray[n + spriteManager.spriteArray.size].arrayIndex = n;
+			sorting2DArray[n + spriteManager.spriteArray.size].depth = textManager.textArray[n].depth;
+			sorting2DArray[n + spriteManager.spriteArray.size].type = SortItem2D::TEXT;
 		}
-		sorting2DCount = spriteManager.spriteCount + textManager.textCount;
+		sorting2DCount = spriteManager.spriteArray.size + textManager.textCount;
 
 		recQuickSort(0, sorting2DCount - 1);
 	}
@@ -3513,6 +3497,7 @@ bool Engine::moe(float input, float check, float margin)
 
 void Engine::samplepoint(glm::vec3 pos, glm::vec3 norm, float rotation, bool foliage, char GI_pass)
 {
+	/*
 	GICamera.pos = pos;
 	GICamera.forward = norm;// glm::vec3(0, 1, 0);
 
@@ -3553,10 +3538,8 @@ void Engine::samplepoint(glm::vec3 pos, glm::vec3 norm, float rotation, bool fol
 		// draw opaque geometry
 		for (int n = 0; n < meshManager.meshCount; n++)
 		{
-
 			if (meshManager.meshArray[n].type == STANDARD)
 			{
-
 				if (!meshManager.meshArray[n].isWater)
 				{
 					if (!meshManager.meshArray[n].transparent)
@@ -3572,15 +3555,14 @@ void Engine::samplepoint(glm::vec3 pos, glm::vec3 norm, float rotation, bool fol
 						meshManager.setTexture(n, GI_shadowMapComp.depth, 15);
 						drawMeshGI(&meshManager.meshArray[n]);
 						meshManager.setShaderConst(n, "GI", 0, 0, 0, 0);
-						meshManager.setTexture(n, shadowMapComp.depth, 15);
+						meshManager.setTexture(n, GI_shadowMapComp.depth, 15);
 					}
 				}
-
 			}
 		}
-		if (foliage) break;
+		if (foliage) break;	
 	}
-
+	*/
 }
 
 void Engine::recompileShaders()
@@ -3608,35 +3590,35 @@ void Engine::recompileShaders()
 	return;
 }
 
-void Engine::generateShadowMap()
+void Engine::generateShadowMap( ShadowMap &shadowMap)
 {
 
 	// render first shadow cascade
-	setRenderToTexture(shadowMap[0], 0);
+	setRenderToTexture(shadowMap.map[0], 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	// Camera matrix
-	cascadeRadius[0] = 10; //10
-	cascadeCenterDist[0] = 9.5; //9.5
-	glm::vec3 center = mainCamera.pos + mainCamera.forward*cascadeCenterDist[0];
+	shadowMap.cascadeRadius[0] = 10; //10
+	shadowMap.cascadeCenterDist[0] = 9.5; //9.5
+	glm::vec3 center = mainCamera.pos + mainCamera.forward*shadowMap.cascadeCenterDist[0];
 
-	shadowCamView[0] = lookat(center + 300.f*sundir, center, 0);
-	glm::vec3 right = glm::vec3(shadowCamView[0][0][0], shadowCamView[0][1][0], shadowCamView[0][2][0]);
-	glm::vec3 up = glm::vec3(shadowCamView[0][0][1], shadowCamView[0][1][1], shadowCamView[0][2][1]);
+	shadowMap.camView[0] = lookat(center + 300.f*sundir, center, 0);
+	glm::vec3 right = glm::vec3(shadowMap.camView[0][0][0], shadowMap.camView[0][1][0], shadowMap.camView[0][2][0]);
+	glm::vec3 up = glm::vec3(shadowMap.camView[0][0][1], shadowMap.camView[0][1][1], shadowMap.camView[0][2][1]);
 
 	float shadowmapFixSize = 32;
 
-	float x = ceilf(glm::dot(center, up) * shadowmapFixSize / cascadeRadius[0]) *(cascadeRadius[0] / shadowmapFixSize);
-	float y = ceilf(glm::dot(center, right) * shadowmapFixSize / cascadeRadius[0]) *(cascadeRadius[0] / shadowmapFixSize);
+	float x = ceilf(glm::dot(center, up) * shadowmapFixSize / shadowMap.cascadeRadius[0]) *(shadowMap.cascadeRadius[0] / shadowmapFixSize);
+	float y = ceilf(glm::dot(center, right) * shadowmapFixSize / shadowMap.cascadeRadius[0]) *(shadowMap.cascadeRadius[0] / shadowmapFixSize);
 	center = up * x + right * y + sundir * glm::dot(center, sundir);
 	glm::vec3 origin = center - sundir * 300.f;
 
-	cascadeCenter[0] = center;
+	shadowMap.cascadeCenter[0] = center;
 
-	shadowCamView[0] = glm::lookAtRH(origin, center, up);
+	shadowMap.camView[0] = glm::lookAtRH(origin, center, up);
 	//shadowCamView[0] = lookat(cascadeCenter[0]+glm::vec3(100), cascadeCenter[0], 0)*translate(-cascadeCenter[0] -glm::vec3(100)); ;
-	shadowOrthoProj[0] = glm::ortho(-cascadeRadius[0], cascadeRadius[0], -cascadeRadius[0], cascadeRadius[0], 1.0f, 500.0f);
-	shadowViewProj[0] = shadowOrthoProj[0] * shadowCamView[0];
+	shadowMap.orthoProj[0] = glm::ortho(-shadowMap.cascadeRadius[0], shadowMap.cascadeRadius[0], -shadowMap.cascadeRadius[0], shadowMap.cascadeRadius[0], 1.0f, 500.0f);
+	shadowMap.viewProj[0] = shadowMap.orthoProj[0] * shadowMap.camView[0];
 
 	for (int n = 0; n < meshManager.meshCount; n++)
 	{
@@ -3644,29 +3626,30 @@ void Engine::generateShadowMap()
 			drawMeshShadowMap(&meshManager.meshArray[n], 0);
 	}
 
+	
 	// render second shadow cascade
-	setRenderToTexture(shadowMap[1], 0);
+	setRenderToTexture(shadowMap.map[1], 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 
-	cascadeRadius[1] = 50.f;
-	cascadeCenterDist[1] = 50;
-	center = mainCamera.pos + mainCamera.forward*cascadeCenterDist[1];
+	shadowMap.cascadeRadius[1] = 50.f;
+	shadowMap.cascadeCenterDist[1] = 50;
+	center = mainCamera.pos + mainCamera.forward*shadowMap.cascadeCenterDist[1];
 
-	shadowCamView[1] = lookat(center + sundir*300.f, center, 0);
-	right = glm::vec3(shadowCamView[1][0][0], shadowCamView[1][1][0], shadowCamView[1][2][0]);
-	up = glm::vec3(shadowCamView[1][0][1], shadowCamView[1][1][1], shadowCamView[1][2][1]);
+	shadowMap.camView[1] = lookat(center + sundir*300.f, center, 0);
+	right = glm::vec3(shadowMap.camView[1][0][0], shadowMap.camView[1][1][0], shadowMap.camView[1][2][0]);
+	up = glm::vec3(shadowMap.camView[1][0][1], shadowMap.camView[1][1][1], shadowMap.camView[1][2][1]);
 
-	x = ceilf(glm::dot(center, up) * shadowmapFixSize / cascadeRadius[1]) *(cascadeRadius[1] / shadowmapFixSize);
-	y = ceilf(glm::dot(center, right) * shadowmapFixSize / cascadeRadius[1]) *(cascadeRadius[1] / shadowmapFixSize);
+	x = ceilf(glm::dot(center, up) * shadowmapFixSize / shadowMap.cascadeRadius[1]) *(shadowMap.cascadeRadius[1] / shadowmapFixSize);
+	y = ceilf(glm::dot(center, right) * shadowmapFixSize / shadowMap.cascadeRadius[1]) *(shadowMap.cascadeRadius[1] / shadowmapFixSize);
 	center = up * x + right * y + sundir * glm::dot(center, sundir);
 	origin = center - sundir * 300.f;
 
 
-	cascadeCenter[1] = center;
-	shadowCamView[1] = glm::lookAtRH(origin, center, up);
-	shadowOrthoProj[1] = glm::ortho(-cascadeRadius[1], cascadeRadius[1], -cascadeRadius[1], cascadeRadius[1], 1.0f, 500.0f);
-	shadowViewProj[1] = shadowOrthoProj[1] * shadowCamView[1];
+	shadowMap.cascadeCenter[1] = center;
+	shadowMap.camView[1] = glm::lookAtRH(origin, center, up);
+	shadowMap.orthoProj[1] = glm::ortho(-shadowMap.cascadeRadius[1], shadowMap.cascadeRadius[1], -shadowMap.cascadeRadius[1], shadowMap.cascadeRadius[1], 1.0f, 500.0f);
+	shadowMap.viewProj[1] = shadowMap.orthoProj[1] * shadowMap.camView[1];
 
 	for (int n = 0; n < meshManager.meshCount; n++)
 	{
@@ -3675,26 +3658,26 @@ void Engine::generateShadowMap()
 	}
 
 	// render third shadow cascade
-	setRenderToTexture(shadowMap[2], 0);
+	setRenderToTexture(shadowMap.map[2], 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	cascadeRadius[2] = 220.0f;
-	cascadeCenterDist[2] = 190;
-	center = mainCamera.pos + mainCamera.forward*cascadeCenterDist[2];
+	shadowMap.cascadeRadius[2] = 220.0f;
+	shadowMap.cascadeCenterDist[2] = 190;
+	center = mainCamera.pos + mainCamera.forward*shadowMap.cascadeCenterDist[2];
 
-	shadowCamView[1] = lookat(center + sundir * 500.f, center, 0);
-	right = glm::vec3(shadowCamView[1][0][0], shadowCamView[1][1][0], shadowCamView[1][2][0]);
-	up = glm::vec3(shadowCamView[1][0][1], shadowCamView[1][1][1], shadowCamView[1][2][1]);
+	shadowMap.camView[1] = lookat(center + sundir * 500.f, center, 0);
+	right = glm::vec3(shadowMap.camView[1][0][0], shadowMap.camView[1][1][0], shadowMap.camView[1][2][0]);
+	up = glm::vec3(shadowMap.camView[1][0][1], shadowMap.camView[1][1][1], shadowMap.camView[1][2][1]);
 
-	x = ceilf(glm::dot(center, up) * shadowmapFixSize / cascadeRadius[2]) *(cascadeRadius[2] / shadowmapFixSize);
-	y = ceilf(glm::dot(center, right) * shadowmapFixSize / cascadeRadius[2]) *(cascadeRadius[2] / shadowmapFixSize);
+	x = ceilf(glm::dot(center, up) * shadowmapFixSize / shadowMap.cascadeRadius[2]) *(shadowMap.cascadeRadius[2] / shadowmapFixSize);
+	y = ceilf(glm::dot(center, right) * shadowmapFixSize / shadowMap.cascadeRadius[2]) *(shadowMap.cascadeRadius[2] / shadowmapFixSize);
 	center = up * x + right * y + sundir * glm::dot(center, sundir);
 	origin = center - sundir * 500.f;
 
-	cascadeCenter[2] = center;
-	shadowCamView[2] = glm::lookAtRH(origin, center, up);
-	shadowOrthoProj[2] = glm::ortho(-cascadeRadius[2], cascadeRadius[2], -cascadeRadius[2], cascadeRadius[2], 1.0f, 1000.f);
-	shadowViewProj[2] = shadowOrthoProj[2] * shadowCamView[2];
+	shadowMap.cascadeCenter[2] = center;
+	shadowMap.camView[2] = glm::lookAtRH(origin, center, up);
+	shadowMap.orthoProj[2] = glm::ortho(-shadowMap.cascadeRadius[2], shadowMap.cascadeRadius[2], -shadowMap.cascadeRadius[2], shadowMap.cascadeRadius[2], 1.0f, 1000.f);
+	shadowMap.viewProj[2] = shadowMap.orthoProj[2] * shadowMap.camView[2];
 
 	for (int n = 0; n < meshManager.meshCount; n++)
 	{
@@ -3703,47 +3686,49 @@ void Engine::generateShadowMap()
 	}
 
 	// render fourth shadow cascade
-	setRenderToTexture(shadowMap[3], 0);
+	setRenderToTexture(shadowMap.map[3], 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	cascadeRadius[3] = 450;
-	cascadeCenterDist[3] = 450;
-	center = mainCamera.pos + mainCamera.forward*cascadeCenterDist[3];
+	shadowMap.cascadeRadius[3] = 450;
+	shadowMap.cascadeCenterDist[3] = 450;
+	center = mainCamera.pos + mainCamera.forward*shadowMap.cascadeCenterDist[3];
 
-	shadowCamView[1] = lookat(center + sundir*500.f, center, 0);
-	right = glm::vec3(shadowCamView[1][0][0], shadowCamView[1][1][0], shadowCamView[1][2][0]);
-	up = glm::vec3(shadowCamView[1][0][1], shadowCamView[1][1][1], shadowCamView[1][2][1]);
+	shadowMap.camView[1] = lookat(center + sundir*500.f, center, 0);
+	right = glm::vec3(shadowMap.camView[1][0][0], shadowMap.camView[1][1][0], shadowMap.camView[1][2][0]);
+	up = glm::vec3(shadowMap.camView[1][0][1], shadowMap.camView[1][1][1], shadowMap.camView[1][2][1]);
 
-	x = ceilf(glm::dot(center, up) * shadowmapFixSize / cascadeRadius[3]) *(cascadeRadius[3] / shadowmapFixSize);
-	y = ceilf(glm::dot(center, right) * shadowmapFixSize / cascadeRadius[3]) *(cascadeRadius[3] / shadowmapFixSize);
+	x = ceilf(glm::dot(center, up) * shadowmapFixSize / shadowMap.cascadeRadius[3]) *(shadowMap.cascadeRadius[3] / shadowmapFixSize);
+	y = ceilf(glm::dot(center, right) * shadowmapFixSize / shadowMap.cascadeRadius[3]) *(shadowMap.cascadeRadius[3] / shadowmapFixSize);
 	center = up * x + right * y + sundir * glm::dot(center, sundir);
 	origin = center - sundir * 500.f;
 
-	cascadeCenter[3] = center;
-	shadowCamView[3] = glm::lookAtRH(origin, center, up);
-	shadowOrthoProj[3] = glm::ortho(-cascadeRadius[3], cascadeRadius[3], -cascadeRadius[3], cascadeRadius[3], 1.0f, 1000.0f);
-	shadowViewProj[3] = shadowOrthoProj[3] * shadowCamView[3];
+	shadowMap.cascadeCenter[3] = center;
+	shadowMap.camView[3] = glm::lookAtRH(origin, center, up);
+	shadowMap.orthoProj[3] = glm::ortho(-shadowMap.cascadeRadius[3], shadowMap.cascadeRadius[3], -shadowMap.cascadeRadius[3], shadowMap.cascadeRadius[3], 1.0f, 1000.0f);
+	shadowMap.viewProj[3] = shadowMap.orthoProj[3] * shadowMap.camView[3];
 
 	for (int n = 0; n < meshManager.meshCount; n++)
 	{
 		if (!meshManager.meshArray[n].transparent && meshManager.meshArray[n].castShadow)
 			drawMeshShadowMap(&meshManager.meshArray[n], 3);
 	}
-
+	
 	//compile shadow maps into single buffer
-	setRenderToTexture(shadowMapComp, 0);
+	setRenderToTexture(shadowMap.compMap, 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 
 	drawMesh(&meshManager.meshArray[shadowCompQuad]);
 
-	glBindTexture(GL_TEXTURE_2D, shadowMapComp.depthID);
-	glGenerateMipmap(GL_TEXTURE_2D);
+	glBindTexture(GL_TEXTURE_2D, shadowMap.compMap.depthID);
+	// mipmapping is very slow
+	glGenerateMipmap(GL_TEXTURE_2D); 
 
 }
 
 void Engine::generateShadowMapGI()
 {
+	/*
 	// render first shadow cascade
 	setRenderToTexture(GI_shadowMap[0], 0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -3833,6 +3818,6 @@ void Engine::generateShadowMapGI()
 
 
 	drawMesh(&meshManager.meshArray[GI_shadowCompQuad]);
-
-
+*/
+	
 }

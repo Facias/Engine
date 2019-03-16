@@ -98,16 +98,10 @@ namespace ENGINE
 			glBindBuffer(GL_ARRAY_BUFFER, uvBufferID);
 			glBufferData(GL_ARRAY_BUFFER, 6 * sizeof(glm::vec2), &uv[0], GL_STATIC_DRAW);
 
-			spriteArray = new Sprite[16];
 			sortingArray = new Sprite*[16];
-			arraySize = 16;
-			spriteCount = 0;
+
 		}
-		Sprite *spriteArray;
-
-		unsigned short int spriteCount;
-		unsigned short int arraySize;
-
+		Stack<Sprite> spriteArray;
 
 		enum type
 		{
@@ -122,7 +116,7 @@ namespace ENGINE
 
 		int createSprite(glm::vec2 size);
 
-		int add(Sprite item);
+
 
 		unsigned short int defaultSpriteShaderID;
 

@@ -44,7 +44,7 @@ TextureObj::TextureObj(const TextureObj &other)
 GLint TextureManager::loadBMP_custom(const char * imagepath)
 {
 
-	printf("Reading image %s\n", imagepath);
+	//printf("Reading image %s\n", imagepath);
 
 	// Data read from the header of the BMP file
 	unsigned char header[54];
@@ -315,35 +315,15 @@ int TextureManager::loadImage(char *name)
 	}
 	else
 	{
-		printf("image %s successful\n", name);
-		return add(temp);
+		//printf("image %s successful\n", name);
+		return texArray.add(temp);
 	}
 }
 
-int TextureManager::add(TextureObj item)
-{
-	if (texCount + 2 > arraySize)
-	{
-		TextureObj *temp = new TextureObj[2*arraySize];
-
-		for (int n = 0; n < texCount; n++)
-		{
-			temp[n] = texArray[n];
-		}
-
-		arraySize *= 2;
-		delete[] texArray;
-		texArray = temp;
-	}
-
-	texArray[texCount++] = item;
-
-	return texCount - 1;
-}
 
 void TextureManager::setWrap(int index, bool u, bool v)
 {
-	glBindTexture(GL_TEXTURE_2D, texArray[index].id);
+	glBindTexture(GL_TEXTURE_2D, texArray.item[index].id);
 	if (u)
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 	else
@@ -354,8 +334,8 @@ void TextureManager::setWrap(int index, bool u, bool v)
 	else
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
 
-	texArray[index].wrapU = u;
-	texArray[index].wrapV = v;
+	texArray.item[index].wrapU = u;
+	texArray.item[index].wrapV = v;
 }
 
 RenderTexture TextureManager::createRenderTexture(int width, int height, bool mipmapping)
@@ -426,8 +406,8 @@ RenderTexture TextureManager::createRenderTexture(int width, int height, bool mi
 	tempDepth.id = temp.depthID;
 	tempDepth.size = temp.size;
 	
-	temp.color = add(tempColor);
-	temp.depth = add(tempDepth);
+	temp.color = texArray.add(tempColor);
+	temp.depth = texArray.add(tempDepth);
 	return temp;
 
 }
@@ -491,8 +471,8 @@ RenderTexture TextureManager::createRenderTextureMultisample(int width, int heig
 	tempDepth.id = temp.depthID;
 	tempDepth.size = temp.size;
 
-	temp.color = add(tempColor);
-	temp.depth = add(tempDepth);
+	temp.color = texArray.add(tempColor);
+	temp.depth = texArray.add(tempDepth);
 
 	
 	return temp;
@@ -593,10 +573,33 @@ GBuffer TextureManager::createGBuffer(int width, int height)
 	tempDepth.id = temp.depthID;
 	tempDepth.size = temp.size;
 
-	temp.position = add(tempPosition);
-	temp.normal = add(tempNormal);
-	temp.color = add(tempColor);
-	temp.depth = add(tempDepth);
+	temp.position = texArray.add(tempPosition);
+	temp.normal = texArray.add(tempNormal);
+	temp.color = texArray.add(tempColor);
+	temp.depth = texArray.add(tempDepth);
 	return temp;
 
+}
+
+void TextureManager::deleteImage(int index)
+{
+	GLuint *ta = new GLuint[1];
+	ta[0] = texArray.item[index].id;
+	glDeleteTextures(1, ta);
+
+	delete ta;
+	texArray.item[index].exists = false;
+}
+
+void TextureManager::deleteImages(int *index, int count)
+{
+	GLuint *ta = new GLuint[count];
+	for (int n = 0 ; n<count; n++)
+		ta[n] = texArray.item[index[n]].id;
+
+	glDeleteTextures(count, ta);
+
+	delete ta;
+	for (int n = 0; n<count; n++)
+		texArray.item[index[n]].exists = false;
 }

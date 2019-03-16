@@ -70,6 +70,8 @@ namespace ENGINE
 		int entityCount;
 		EntityEntry * entityArray;
 		int arraySize;
+
+		glm::vec3 sunpos;
 	};
 }
 

@@ -10,7 +10,7 @@
 
 #include "Texture.h"
 
-#include "Text.h"
+#include "Text2D.h"
 
 using namespace ENGINE;
 
@@ -28,19 +28,6 @@ void Text::cleanupText2D() {
 	// Delete shader
 	glDeleteProgram(Text2DShaderID);
 }*/
-
-TextObj::TextObj()
-{
-	type = TextManager::STANDARD;
-	//vertices = new glm::vec2[256];
-	//UVs = new glm::vec2[256];
-	//str = new char[256];
-	size = 36.0f;
-	constantCount = 0;
-	visible = true;
-	color = glm::vec4(1);
-	depth = 9.9f;
-}
 
 TextManager::TextManager()
 {
@@ -148,7 +135,7 @@ int TextManager::loadFont(char *filename)
 	Font temp;
 	// Initialize texture
 	int a = textureManager->loadImage(filename);
-	temp.fontImg = textureManager->texArray.item[a];
+	temp.fontImg = textureManager->texArray[a];
 	printf("\n\n\nfont img index %d \n\n\n\n", a);
 
 
@@ -204,11 +191,6 @@ void TextManager::setString(int index, const char *str)
 }
 */
 
-void TextManager::setType(int index, char tp)
-{
-	textArray[index].type = tp;
-}
-
 void TextManager::setVisible(int index, bool state)
 {
 	textArray[index].visible = state;
@@ -263,6 +245,7 @@ void TextManager::draw(int index)
 		xpos += currentFont->characterSize[current->str[i]].x*scale;
 
 		vertices[i * 6] = vertex_up_left;
+
 
 		vertices[i * 6 + 1] = vertex_down_left;
 		vertices[i * 6 + 2] = vertex_up_right;
@@ -421,11 +404,6 @@ void TextManager::setShaderConst(int index, char *name, float v0, float v1, floa
 	text->constantCount++;
 	
 	return;
-}
-
-char TextManager::getType(int index)
-{
-	return textArray[index].type;
 }
 
 bool TextManager::getVisible(int index)

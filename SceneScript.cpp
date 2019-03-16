@@ -94,16 +94,22 @@ EntityEntry::EntityEntry(const EntityEntry &other)
 
 void SceneScript::parseFile(char *name)
 {
-	
+
+
 	FILE *file = NULL;
+	char direct[256];
+	if (name == "Scenes/island.ss") strcpy(direct, "Scenes/island/");
+	if (name == "Scenes/town.ss") strcpy(direct, "Scenes/town/");
+
+
 
 	fopen_s(&file, name, "r");
 	if (file == NULL)
 	{
-		printf("script file %s cannot be opened", name);
+		printf("script file %s cannot be opened\n", name);
 		return;
 	}
-	printf("\n\n");
+
 	while (1)
 	{
 		char line[1024];
@@ -112,7 +118,7 @@ void SceneScript::parseFile(char *name)
 		char *getLine = fgets(line, sizeof(line), file);
 		if (getLine == NULL)
 		{
-			printf("finished reading scene script %s.", name);
+			//printf("finished reading scene script %s.", name);
 			break;
 		}
 		int pieceCount = 0;
@@ -131,7 +137,6 @@ void SceneScript::parseFile(char *name)
 
 		if (!skipping)
 		{
-			printf("in\n");
 			if (strcmp("define", piece[0]) == 0)
 			{
 				pieceCount = sscanf(line, "%s %s", &piece[0], &piece[1]);
@@ -146,7 +151,12 @@ void SceneScript::parseFile(char *name)
 			{
 				if (entityCount > 0)
 				{
-					strcpy(entityArray[entityCount - 1].meshName, piece[1]);
+					char tempname[64];
+					strcpy(tempname, direct);
+					strcat(tempname, piece[1]);
+					strcpy(entityArray[entityCount - 1].meshName, tempname );
+
+
 				}
 			}
 
@@ -188,7 +198,6 @@ void SceneScript::parseFile(char *name)
 				{
 					int val = std::stoi(piece[1]);
 					entityArray[entityCount - 1].transparent = val;
-					printf("\n transparent %d\n", entityArray[entityCount - 1].transparent);
 				}
 			}
 
@@ -360,9 +369,11 @@ void SceneScript::parseFile(char *name)
 			{
 				if (entityCount > 0)
 				{
-					
+					char tempname[64];
+					strcpy(tempname, direct);
+					strcat(tempname, piece[1]);
 					entityArray[entityCount - 1].texAssigned[0] = true;
-					strcpy(entityArray[entityCount - 1].texName[0], piece[1]);
+					strcpy(entityArray[entityCount - 1].texName[0], tempname);
 
 					if (pieceCount > 2)
 						entityArray[entityCount - 1].texWrap[0] = std::stoi(piece[2]);
@@ -373,8 +384,11 @@ void SceneScript::parseFile(char *name)
 			{
 				if (entityCount > 0)
 				{
+					char tempname[64];
+					strcpy(tempname, direct);
+					strcat(tempname, piece[1]);
 					entityArray[entityCount - 1].texAssigned[1] = true;
-					strcpy(entityArray[entityCount - 1].texName[1], piece[1]);
+					strcpy(entityArray[entityCount - 1].texName[1], tempname);
 					
 					if (pieceCount > 2)
 						entityArray[entityCount - 1].texWrap[1] = std::stoi(piece[2]);
@@ -385,8 +399,11 @@ void SceneScript::parseFile(char *name)
 			{
 				if (entityCount > 0)
 				{
+					char tempname[64];
+					strcpy(tempname, direct);
+					strcat(tempname, piece[1]);
 					entityArray[entityCount - 1].texAssigned[2] = true;
-					strcpy(entityArray[entityCount - 1].texName[2], piece[1]);
+					strcpy(entityArray[entityCount - 1].texName[2], tempname);
 
 					if (pieceCount > 2)
 						entityArray[entityCount - 1].texWrap[2] = std::stoi(piece[2]);
@@ -397,8 +414,11 @@ void SceneScript::parseFile(char *name)
 			{
 				if (entityCount > 0)
 				{
+					char tempname[64];
+					strcpy(tempname, direct);
+					strcat(tempname, piece[1]);
 					entityArray[entityCount - 1].texAssigned[3] = true;
-					strcpy(entityArray[entityCount - 1].texName[3], piece[1]);
+					strcpy(entityArray[entityCount - 1].texName[3], tempname);
 
 					if (pieceCount > 2)
 						entityArray[entityCount - 1].texWrap[3] = std::stoi(piece[2]);
@@ -409,8 +429,11 @@ void SceneScript::parseFile(char *name)
 			{
 				if (entityCount > 0)
 				{
+					char tempname[64];
+					strcpy(tempname, direct);
+					strcat(tempname, piece[1]);
 					entityArray[entityCount - 1].texAssigned[4] = true;
-					strcpy(entityArray[entityCount - 1].texName[4], piece[1]);
+					strcpy(entityArray[entityCount - 1].texName[4], tempname);
 
 					if (pieceCount > 2)
 						entityArray[entityCount - 1].texWrap[4] = std::stoi(piece[2]);
@@ -421,8 +444,11 @@ void SceneScript::parseFile(char *name)
 			{
 				if (entityCount > 0)
 				{
+					char tempname[64];
+					strcpy(tempname, direct);
+					strcat(tempname, piece[1]);
 					entityArray[entityCount - 1].texAssigned[5] = true;
-					strcpy(entityArray[entityCount - 1].texName[5], piece[1]);
+					strcpy(entityArray[entityCount - 1].texName[5], tempname);
 
 					if (pieceCount > 2)
 						entityArray[entityCount - 1].texWrap[5] = std::stoi(piece[2]);

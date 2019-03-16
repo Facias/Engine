@@ -82,7 +82,7 @@ GLuint ENGINE::LoadShaders(const char * vertex_file_path, const char * fragment_
 
 
 	// Compile Vertex Shader
-	printf("Compiling shader : %s\n", vertex_file_path);
+	//printf("Compiling shader : %s\n", vertex_file_path);
 	char const * VertexSourcePointer = VertexShaderCode.c_str();
 	glShaderSource(VertexShaderID, 1, &VertexSourcePointer, NULL);
 	glCompileShader(VertexShaderID);
@@ -99,7 +99,7 @@ GLuint ENGINE::LoadShaders(const char * vertex_file_path, const char * fragment_
 
 
 	// Compile Fragment Shader
-	printf("Compiling shader : %s\n", fragment_file_path);
+	//printf("Compiling shader : %s\n", fragment_file_path);
 	char const * FragmentSourcePointer = FragmentShaderCode.c_str();
 	glShaderSource(FragmentShaderID, 1, &FragmentSourcePointer, NULL);
 	glCompileShader(FragmentShaderID);
@@ -115,7 +115,7 @@ GLuint ENGINE::LoadShaders(const char * vertex_file_path, const char * fragment_
 	}
 
 	// Link the program
-	printf("Linking program\n");
+	//printf("Linking program\n");
 	GLuint ProgramID = glCreateProgram();
 	glAttachShader(ProgramID, VertexShaderID);
 	glAttachShader(ProgramID, FragmentShaderID);
@@ -164,7 +164,7 @@ void Shader::compileUniforms()
 			{
 				
 				
-				printf("%s %s %s\n", prefix, typeSTR, name);
+				//printf("%s %s %s\n", prefix, typeSTR, name);
 
 				if (strcmp(typeSTR, "bool") == 0)
 				{
@@ -216,7 +216,7 @@ void Shader::compileUniforms()
 			if (read == EOF) break;
 			if (strcmp(prefix, "uniform") == 0)
 			{
-				printf("%s %s %s\n" ,prefix, typeSTR, name);
+				//printf("%s %s %s\n" ,prefix, typeSTR, name);
 
 				if (strcmp(typeSTR, "bool") == 0)
 				{
@@ -421,7 +421,7 @@ int ShaderManager::add(Shader shader)
 		arraySize *= 2;
 		shaderArray = temp;
 
-		printf("COMPLETED DOUBLE %d \n", arraySize);
+		//printf("COMPLETED DOUBLE %d \n", arraySize);
 	}
 	for (int n = 0; n < shaderCount; n++)
 	{
@@ -429,13 +429,13 @@ int ShaderManager::add(Shader shader)
 		{
 			shaderArray[n] = shader;
 			printf(shader.fragName);
-			printf("COMPLETED ADD %d \n", n);
+			//printf("COMPLETED ADD %d \n", n);
 			return n;
 		}
 	}
 	shaderArray[shaderCount] = shader;
 	shaderCount++;
-	printf("COMPLETED ADD %d \n", shaderCount);
+	//printf("COMPLETED ADD %d \n", shaderCount);
 	return shaderCount-1;
 }
 

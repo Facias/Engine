@@ -23,20 +23,20 @@
 #include "Camera.h"
 #include "SceneScript.h"
 #include "Sprite.h"
+#include "ShadowMap.h"
 //#include "Network.h"
 
 #include "Octree.h"
 #include "Editor.h"
 
 
+#define WIDTH 1920
+#define HEIGHT 1080
 
+//#define completePastWritesBeforeFutureWrites _WriteBarrier(); _mm_sfence()
+//#define completePastReadsBeforeFutureReads _ReadBarrier()
 
-#define WIDTH 1600
-#define HEIGHT 900
-
-#define completePastWritesBeforeFutureWrites _WriteBarrier(); _mm_sfence()
-#define completePastReadsBeforeFutureReads _ReadBarrier()
-
+#define STARTAREA "town"
 /*
  InterlockedIncrement()
 */
@@ -51,16 +51,7 @@
 
 */
 
-struct ImageData
-{
-	char* name;
-	unsigned short int width;
-	unsigned short int height;
-	unsigned char depth;
 
-	glm::vec4 *data;
-
-};
 
 struct GISamplePoint
 {
@@ -76,12 +67,70 @@ struct GISamplePoint
 	glm::vec4 lightVal;
 };
 
+struct SceneLight
+{
+	SceneLight()
+	{
+		dir = glm::vec3(0.f, 0.f, 1.f);
+		type = POINTLIGHT;
+		brightness = 1.0f;
+		color = glm::vec3(1.0f);
+		attenuation = 1.0f;
+
+		active = true;
+		exists = true;
+
+		castShadow = false;
+	}
+
+	SceneLight(char lightType, bool shadows, int shadowIndex)
+	{
+		type = lightType;
+		castShadow = true;
+		shadowMapIndex = shadowIndex;
+		brightness = 1.f;
+		color = glm::vec3(1.f);
+		attenuation = 1.f;
+
+		active = true;
+		exists = true;
+
+	}
+
+	glm::vec3 pos;
+	glm::vec3 dir;
+	char type;
+	enum LightType
+	{
+		POINTLIGHT,
+		SPOTLIGHT,
+		DIRECTIONAL
+	};
+
+	float brightness;
+	float attenuation;
+	glm::vec3 color;
+	bool active;
+	bool exists;
+
+	//shadows
+	bool castShadow;
+	int shadowMapIndex; 
+
+};
 
 
 namespace ENGINE
 {
 	struct SortItem2D;
 
+	struct Area
+	{
+		char name[32];
+		Stack<int> meshList;
+		Stack<int> textureList;
+		Stack<glm::vec3> entranceList;
+	};
 
 	struct win32_thread_info
 	{
@@ -106,7 +155,7 @@ namespace ENGINE
 		work_queue_entry *Entry = entries + entryCount;
 		Entry->stringToPrint = str;
 
-		completePastWritesBeforeFutureWrites;
+		//completePastWritesBeforeFutureWrites;
 
 		++entryCount;
 	}
@@ -128,7 +177,7 @@ namespace ENGINE
 				{
 					int entryIndex = InterlockedIncrement((LONG volatile *)&nextEntryToDo) - 1;
 
-					completePastReadsBeforeFutureReads;
+					//completePastReadsBeforeFutureReads;
 
 				}
 				else
@@ -177,8 +226,7 @@ namespace ENGINE
 		void setResolution(int width, int height);
 
 		
-		void generateShadowMap();
-		void generateShadowMapGI();
+		
 
 		//string methods
 		char* strToChar(std::string str);
@@ -233,25 +281,9 @@ namespace ENGINE
 		int lightShaftQuad;
 		int lightShaftShader;
 
-		// shadows
-		RenderTexture shadowMap[4];
-		RenderTexture shadowMapComp;
-		glm::mat4 shadowOrthoProj[4];
-		glm::mat4 shadowCamView[4];
-		glm::mat4 shadowViewProj[4];
-		glm::mat4 mvp_shadow;
-		glm::vec3 cascadeCenter[4];
-		unsigned short int shadowmapRes;
-		float cascadeRadius[4]; // radius of cascade sphere
-		float cascadeCenterDist[4]; // distance from camera to cascade center
-		short int shadowCompShader;
-		int shadowCompQuad;
+		
 
-		//GI shadows
-		RenderTexture GI_shadowMap[4];
-		RenderTexture GI_shadowMapComp;
-		unsigned short int GI_shadowmapRes;
-		int GI_shadowCompQuad;
+		
 		
 
 		//global illumination
@@ -373,7 +405,7 @@ namespace ENGINE
 
 		PFNWGLSWAPINTERVALEXTPROC wglSwapIntervalEXT;
 
-		glm::vec3 ShadowCascadeCenter;
+		
 		
 		void genMipmaps(TextureObj tex);
 
@@ -387,7 +419,20 @@ namespace ENGINE
 		Shader *hold; // rendertime shader swapping
 		glm::ivec2 res;
 
-	
+
+		ShadowMap shadowMap;
+		int shadowCompQuad;
+		short int shadowCompShader;
+
+		//GI shadows
+		RenderTexture GI_shadowMap[4];
+		RenderTexture GI_shadowMapComp;
+		unsigned short int GI_shadowmapRes;
+		int GI_shadowCompQuad;
+		glm::mat4 mvp_shadowGI;
+
+		void generateShadowMap(ShadowMap &shadowMap);
+		void generateShadowMapGI();
 
 		static glm::vec3 raycastPlane(glm::vec3 p0, glm::vec3 p1, glm::vec3 norm, glm::vec3 orig);
 
